@@ -548,7 +548,7 @@ training_loss:
 # Options of hyperparameter search jobs (job.type=="search").
 search:
   # Type of search job (see respective configuration key). LibKGE ships with the
-  # following jobs: manual_search, grid_search, ax_search
+  # following jobs: manual_search, grid_search, ax_search, hyperband_search
   type: ax_search
 
   # Maximum number of parallel training jobs to run during a search.
@@ -616,6 +616,62 @@ ax_search:
   # https://ax.dev/api/service.html#module-ax.service.ax_client
   parameters: []
   parameter_constraints: []
+  
+# Dynamic search job that picks configurations using HpBandSter
+hyperband_search:
+  class_name: HyperBandSearchJob
+  
+  # Nameserver configuration required by HPBandSter
+  run_id: ''
+  host: ''
+  port: ''
+  
+  # Random seed for generating the trial configs
+  seed: 0
+  
+  # todo: do we support multiple workers?
+  num_workers: 1
+  
+  # Maximal number of successive halving rounds. Min budget is calculated using this.
+  max_sh_rounds: 5
+  
+  # Defnie which sh rounds to ignore
+  ignore_sh_rounds: [false, false, false, false, false]
+  
+  # Size budget tolerance is added to each round's size budget. This allows to manually intervene
+  # which subsets to use.
+  size_budget_tolerance: 0.00
+  
+  # Epoch bdget tolerance is added to the respective round's epoch budget. Index 0 refers
+  # to the first and last index to the last SH round.
+  epoch_budget_tolerance: [0,0,0,0,0]
+  
+  # Maximum epochs for training. Will be scaled down based on the SH budget in each round.
+  max_epoch_budget: 400
+  
+  # Eta for size and epoch budget. Budget will be shared equally between size and epochs.
+  eta: 4
+  
+  # Possible options are:
+  # - 'both': dynamically change epochs and dataset size (50-50)
+  # - 'epochs': only change epochs and use full dataset
+  # - 'dataset': only change dataset sizes and use static number of epochs
+  variant: 'both'
+  
+  # Information about the available subsets. This should include:
+  # - name: name of suffix which is used in the subset filenames (use '' for full data)
+  # - num_entities: number of entities contained in the subset
+  # - num_relations: number of relations contained in the subset
+  # - num_train_triples: number of training triples contained in the subset
+  # - num_valid_triples: number of validation triples contained in the subset
+  # - estimated_power_usage: optional parameter for custom power estimates
+  subsets: []
+  
+  # Number of Hyperband iterations (if set to 1, the search equals successive halving)
+  num_hpb_iter: 1
+ 
+  # Search space definition passed to HPBandSter
+  parameters: []
 
 
 ## USER PARAMETERS #####################################################################
