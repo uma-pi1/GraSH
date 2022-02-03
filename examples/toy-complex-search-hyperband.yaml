@@ -10,13 +10,14 @@ hyperband_search:
   host: '127.0.0.2'
   port: "None"
   seed: 1
-  n_workers: 1
-  sleep_interval: 0
-  min_budget: 0.012346
-  max_budget: 1.0
-  eta: 3
-  subsets: [['', 1079040, 123182], ['7-core', 792630, 62853], ['9-core', 505130, 34147], ['10-core', 352857, 22085], ['11-core', 217676, 12794]
-  n_iter: 1
+  num_workers: 1
+  max_sh_rounds: 3
+  max_epoch_budget: 16
+  epoch_budget_tolerance: [0,0,0]
+  eta: 4
+  variant: 'epochs'
+  subsets: []
+  num_hpb_iter: 1
   parameters:
     - name: train.optimizer.default.args.lr
       type: range

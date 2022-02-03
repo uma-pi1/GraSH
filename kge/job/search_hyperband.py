@@ -57,27 +57,28 @@ class HyperBandSearchJob(AutoSearchJob):
             w.run(background=True)
             self.workers.append(w)
 
-        # compute relative sizes and costs for the available subsets
-        self.subset_stats = self.config.get("hyperband_search.subsets")
-        for i in range(len(self.subset_stats)):
-            self.subset_stats[i]["relative_entities"] = \
-                self.subset_stats[i]["num_entities"] / self.subset_stats[0]["num_entities"]
-            self.subset_stats[i]["relative_train"] = \
-                self.subset_stats[i]["num_train_triples"] / self.subset_stats[0]["num_train_triples"]
-            # use custom power estimate if available, else compute it
-            if "estimated_power_usage" in self.subset_stats[i]:
-                self.subset_stats[i]["relative_costs"] = self.subset_stats[i]["estimated_power_usage"]
-            else:
-                self.subset_stats[i]["relative_costs"] = \
-                    self.subset_stats[i]["relative_entities"] * self.subset_stats[i]["relative_train"]
+        if self.config.get("hyperband_search.variant") != "epochs":
+            # compute relative sizes and costs for the available subsets
+            self.subset_stats = self.config.get("hyperband_search.subsets")
+            for i in range(len(self.subset_stats)):
+                self.subset_stats[i]["relative_entities"] = \
+                    self.subset_stats[i]["num_entities"] / self.subset_stats[0]["num_entities"]
+                self.subset_stats[i]["relative_train"] = \
+                    self.subset_stats[i]["num_train_triples"] / self.subset_stats[0]["num_train_triples"]
+                # use custom power estimate if available, else compute it
+                if "estimated_power_usage" in self.subset_stats[i]:
+                    self.subset_stats[i]["relative_costs"] = self.subset_stats[i]["estimated_power_usage"]
+                else:
+                    self.subset_stats[i]["relative_costs"] = \
+                        self.subset_stats[i]["relative_entities"] * self.subset_stats[i]["relative_train"]
 
-        # load subgraph datasets
-        self.subsets = list()
-        for i in range(len(self.subset_stats)):
-            config_custom_data = copy.deepcopy(self.config)
-            config_custom_data = self.modify_dataset_config(i, config_custom_data)
-            custom_dataset = Dataset.create(config_custom_data)
-            self.subsets.append(custom_dataset)
+            # load subgraph datasets
+            self.subsets = list()
+            for i in range(len(self.subset_stats)):
+                config_custom_data = copy.deepcopy(self.config)
+                config_custom_data = self.modify_dataset_config(i, config_custom_data)
+                custom_dataset = Dataset.create(config_custom_data)
+                self.subsets.append(custom_dataset)
 
         # create empty dict for id generation
         self.id_dict = dict()
@@ -205,38 +206,39 @@ class HyperBandWorker(Worker):
             epochs = math.floor(self.parent_job.config.get("hyperband_search.max_epoch_budget") * epoch_budget)
             epochs += self.parent_job.config.get("hyperband_search.epoch_budget_tolerance")[int(sh_iter)]
         elif self.parent_job.config.get("hyperband_search.variant") == 'epochs':
-            size_budget = 1.0
             epoch_budget = budget
             epochs = math.floor(self.parent_job.config.get("hyperband_search.max_epoch_budget") * epoch_budget)
             epochs += self.parent_job.config.get("hyperband_search.epoch_budget_tolerance")[int(sh_iter)]
 
-        # determine and set the dataset to use based on the budget
-        for i in range(len(self.parent_job.subset_stats)):
-            if self.parent_job.subset_stats[i]['relative_costs'] <= size_budget:
-                subset_index = i
-                break
-        self.parent_job.dataset = self.parent_job.subsets[subset_index]
-        conf = self.parent_job.modify_dataset_config(subset_index, conf)
+        if self.parent_job.config.get("hyperband_search.variant") != 'epochs':
+            # determine and set the dataset to use based on the budget
+            for i in range(len(self.parent_job.subset_stats)):
+                if self.parent_job.subset_stats[i]['relative_costs'] <= size_budget:
+                    subset_index = i
+                    break
+            self.parent_job.dataset = self.parent_job.subsets[subset_index]
+            conf = self.parent_job.modify_dataset_config(subset_index, conf)
+
+            # downscale number of negatives
+            number_samples_s = parameters.get("negative_sampling.num_samples.s")
+            conf.set("negative_sampling.num_samples.s",
+                     math.ceil(number_samples_s * self.parent_job.subset_stats[subset_index]["relative_entities"]))
+            number_samples_o = parameters.get("negative_sampling.num_samples.o")
+            conf.set("negative_sampling.num_samples.o",
+                     math.ceil(number_samples_o * self.parent_job.subset_stats[subset_index]["relative_entities"]))
+
+            # reuse the predecessor model checkpoint if available to keep initialization
+            if sh_iter != '00':
+                predecessor_trial_id = f"{hpb_iter}{str('{:02d}'.format(int(sh_iter) - 1))}{config_no}"
+                path_to_model = f"{os.path.dirname(conf.folder)}/{predecessor_trial_id}/model_00000.pt"
+                conf.set("lookup_embedder.pretrain.model_filename", path_to_model)
+
         # set the number of epochs
         conf.set("train.max_epochs", epochs)
 
         # set valid.every to train.max_epochs if its modulo != 0
         if epochs % self.parent_job.config.get("valid.every") != 0:
             conf.set("valid.every", epochs)
-
-        # reuse the predecessor model checkpoint if available to keep initialization
-        if sh_iter != '00' and self.parent_job.config.get("hyperband_search.variant") != 'epochs':
-            predecessor_trial_id = f"{hpb_iter}{str('{:02d}'.format(int(sh_iter)-1))}{config_no}"
-            path_to_model = f"{os.path.dirname(conf.folder)}/{predecessor_trial_id}/model_00000.pt"
-            conf.set("lookup_embedder.pretrain.model_filename", path_to_model)
-
-        # downscale number of negatives
-        number_samples_s = parameters.get("negative_sampling.num_samples.s")
-        conf.set("negative_sampling.num_samples.s",
-                 math.ceil(number_samples_s * self.parent_job.subset_stats[subset_index]["relative_entities"]))
-        number_samples_o = parameters.get("negative_sampling.num_samples.o")
-        conf.set("negative_sampling.num_samples.o",
-                 math.ceil(number_samples_o * self.parent_job.subset_stats[subset_index]["relative_entities"]))
 
         # todo: compute total number of trials in init
         num_train_trials = 'x'
