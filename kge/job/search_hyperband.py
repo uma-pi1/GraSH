@@ -82,11 +82,6 @@ class HyperBandSearchJob(AutoSearchJob):
         # create empty dict for id generation
         self.id_dict = dict()
 
-        # create dict for result collection
-        self.result_dict = dict()
-        for sh_round in range(self.config.get("hyperband_search.max_sh_rounds")):
-            self.result_dict[sh_round] = dict()
-
 
     def modify_dataset_config(self, subset_index, config):
         """
@@ -201,20 +196,18 @@ class HyperBandWorker(Worker):
         # determine the subset and epoch budget for this trial
         if self.parent_job.config.get("hyperband_search.variant") == 'dataset':
             size_budget = budget
-            size_budget += self.parent_job.config.get("hyperband_search.size_budget_tolerance")
             epochs = self.parent_job.config.get("hyperband_search.max_epoch_budget")
         elif self.parent_job.config.get("hyperband_search.variant") == 'both':
             size_budget = budget* math.pow(2, self.parent_job.config.get("hyperband_search.max_sh_rounds") -
                                            int(sh_iter) - 1)
-            size_budget += self.parent_job.config.get("hyperband_search.size_budget_tolerance")
             epoch_budget = budget * math.pow(2, self.parent_job.config.get("hyperband_search.max_sh_rounds") -
                                             int(sh_iter) - 1)
-            epochs = math.ceil(self.parent_job.config.get("hyperband_search.max_epoch_budget") * epoch_budget)
+            epochs = math.floor(self.parent_job.config.get("hyperband_search.max_epoch_budget") * epoch_budget)
             epochs += self.parent_job.config.get("hyperband_search.epoch_budget_tolerance")[int(sh_iter)]
         elif self.parent_job.config.get("hyperband_search.variant") == 'epochs':
             size_budget = 1.0
             epoch_budget = budget
-            epochs = math.ceil(self.parent_job.config.get("hyperband_search.max_epoch_budget") * epoch_budget)
+            epochs = math.floor(self.parent_job.config.get("hyperband_search.max_epoch_budget") * epoch_budget)
             epochs += self.parent_job.config.get("hyperband_search.epoch_budget_tolerance")[int(sh_iter)]
 
         # determine and set the dataset to use based on the budget

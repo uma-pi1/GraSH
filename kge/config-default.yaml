@@ -632,15 +632,8 @@ hyperband_search:
   # todo: do we support multiple workers?
   num_workers: 1
   
-  # Maximal number of successive halving rounds. Min budget is calculated using this.
+  # Maximal number of successive halving rounds. Min budget is calculated from this value.
   max_sh_rounds: 5
-  
-  # Defnie which sh rounds to ignore
-  ignore_sh_rounds: [false, false, false, false, false]
-  
-  # Size budget tolerance is added to each round's size budget. This allows to manually intervene
-  # which subsets to use.
-  size_budget_tolerance: 0.00
   
   # Epoch bdget tolerance is added to the respective round's epoch budget. Index 0 refers
   # to the first and last index to the last SH round.
@@ -656,7 +649,7 @@ hyperband_search:
   # - 'both': dynamically change epochs and dataset size (50-50)
   # - 'epochs': only change epochs and use full dataset
   # - 'dataset': only change dataset sizes and use static number of epochs
-  variant: 'both'
+  variant: 'dataset'
   
   # Information about the available subsets. This should include:
   # - name: name of suffix which is used in the subset filenames (use '' for full data)
