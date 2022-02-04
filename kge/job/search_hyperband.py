@@ -112,34 +112,44 @@ class HyperBandSearchJob(AutoSearchJob):
         # create empty dict for id generation
         self.id_dict = dict()
 
-
     def modify_dataset_config(self, subset_index, config):
         """
         Modify the dataset part of a given config by replacing with the subset data.
         :return: modified config
         """
-        config.set("dataset.num_entities",
-                               self.subset_stats[subset_index]["num_entities"])
-        config.set("dataset.num_relations",
-                               self.subset_stats[subset_index]["num_relations"])
-        config.set("dataset.files.entity_ids.filename",
-                               f"entity_ids{self.subset_stats[subset_index]['name']}.del")
-        config.set("dataset.files.entity_strings.filename",
-                               f"entity_ids{self.subset_stats[subset_index]['name']}.del")
-        config.set("dataset.files.relation_ids.filename",
-                               f"relation_ids{self.subset_stats[subset_index]['name']}.del")
-        config.set("dataset.files.relation_strings.filename",
-                               f"relation_ids{self.subset_stats[subset_index]['name']}.del")
-        config.set("dataset.files.train.filename",
-                               f"train{self.subset_stats[subset_index]['name']}.del")
-        config.set("dataset.files.valid.filename",
-                               f"valid{self.subset_stats[subset_index]['name']}.del")
+        path_to_subsets = os.path.join("subsets", "k-core")
+        subset_stats = self.subset_stats[subset_index]
+        config.set("dataset.num_entities", subset_stats["num_entities"])
+        config.set("dataset.num_relations", subset_stats["num_relations"])
+        config.set(
+            "dataset.files.entity_ids.filename",
+            os.path.join(path_to_subsets, f"entity_ids{subset_stats['name']}.del")
+        )
+        config.set(
+            "dataset.files.entity_strings.filename",
+            os.path.join(path_to_subsets, f"entity_ids{subset_stats['name']}.del")
+        )
+        config.set(
+            "dataset.files.relation_ids.filename",
+            os.path.join(path_to_subsets, f"relation_ids{subset_stats['name']}.del")
+        )
+        config.set(
+            "dataset.files.relation_strings.filename",
+            os.path.join(path_to_subsets, f"relation_ids{subset_stats['name']}.del")
+        )
+        config.set(
+            "dataset.files.train.filename",
+            os.path.join(path_to_subsets, f"train{subset_stats['name']}.del")
+        )
+        config.set(
+            "dataset.files.valid.filename",
+            os.path.join(path_to_subsets, f"valid{subset_stats['name']}.del")
+        )
         # only set test set for original dataset. Use the valid sets for all others.
-        if self.subset_stats[subset_index]['name'] == '':
+        if subset_stats['name'] == '':
             config.set("dataset.files.test.filename", "test.del")
         else:
-            config.set("dataset.files.test.filename",
-                       f"valid{self.subset_stats[subset_index]['name']}.del")
+            config.set("dataset.files.test.filename", f"valid{subset_stats['name']}.del")
         return config
 
     def register_trial(self, parameters=None):
