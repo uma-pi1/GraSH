@@ -19,6 +19,7 @@ import os
 import yaml
 import shutil
 from collections import defaultdict
+import torch.multiprocessing as mp
 
 
 class HyperBandPatch(HyperBand):
@@ -33,13 +34,13 @@ class HyperBandPatch(HyperBand):
         with self.thread_cond:
             self.assigned_devices[config_id] = self.free_devices.pop()
             config["job.device"] = self.assigned_devices[config_id]
-        super(HyperBandPatch, self)._submit_job(config_id, config, budget)
+        return super(HyperBandPatch, self)._submit_job(config_id, config, budget)
 
     def job_callback(self, job):
         with self.thread_cond:
             self.free_devices.append(self.assigned_devices[job.id])
             del self.assigned_devices[job.id]
-        super(HyperBandPatch, self).job_callback(job)
+        return super(HyperBandPatch, self).job_callback(job)
 
 
 class HyperBandSearchJob(AutoSearchJob):
@@ -52,6 +53,9 @@ class HyperBandSearchJob(AutoSearchJob):
         super().__init__(config, dataset, parent_job)
         self.name_server = None  # Server address to run the job on
         self.workers = []       # Workers that will run in parallel
+        # create empty dict for id generation
+        self.id_dict = dict()
+        self.processes = []
 
     def init_search(self):
         # Assigning the port
@@ -66,6 +70,7 @@ class HyperBandSearchJob(AutoSearchJob):
         # Start the server
         self.name_server.start()
 
+        #worker_futures = []
         # Create workers (dummy logger to avoid output overhead from HPBandSter)
         for i in range(self.config.get("search.num_workers")):
             w = HyperBandWorker(
@@ -76,7 +81,15 @@ class HyperBandSearchJob(AutoSearchJob):
                 parent_job=self,
                 id=i
             )
-            w.run(background=True)
+            if self.config.get("search.num_workers") == 1:
+                w.run(background=True)
+            else:
+                # todo: figure out why the process pool is not starting the jobs
+                p = mp.Process(target=w.run, args=(False,))
+                self.processes.append(p)
+                p.start()
+                #future = self.process_pool.submit(w.run, w, False)
+                #worker_futures.append(future)
             self.workers.append(w)
 
         if self.config.get("hyperband_search.variant") != "epochs":
@@ -109,8 +122,6 @@ class HyperBandSearchJob(AutoSearchJob):
                 custom_dataset = Dataset.create(config_custom_data)
                 self.subsets.append(custom_dataset)
 
-        # create empty dict for id generation
-        self.id_dict = dict()
 
     def modify_dataset_config(self, subset_index, config):
         """
@@ -194,6 +205,8 @@ class HyperBandSearchJob(AutoSearchJob):
         # Shut it down
         hpb.shutdown(shutdown_workers=True)
         self.name_server.shutdown()
+        for p in self.processes:
+            p.terminate()
 
 
 class HyperBandWorker(Worker):
@@ -217,7 +230,6 @@ class HyperBandWorker(Worker):
         :param kwargs:
         :return: dictionary containing the best hyper-parameter configuration of the trial
         """
-
         parameters = _process_deprecated_options(copy.deepcopy(config))
 
         # use first and thrid value of config_id to create the basis of the foldername

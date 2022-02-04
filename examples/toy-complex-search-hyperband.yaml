@@ -7,7 +7,7 @@ model: complex
 search.type: hyperband_search
 hyperband_search:
   run_id: 'hpb-toy-example'
-  host: '127.0.0.2'
+  host: '127.0.0.1'
   port: "None"
   seed: 1
   num_workers: 1
