@@ -269,10 +269,13 @@ class HyperBandWorker(Worker):
 
         if self.parent_job.config.get("hyperband_search.variant") != 'epochs':
             # determine and set the dataset to use based on the budget
+            subset_index = -1
             for i in range(len(self.parent_job.subset_stats)):
                 if self.parent_job.subset_stats[i]['relative_costs'] <= size_budget:
                     subset_index = i
                     break
+            if subset_index == -1:
+                raise ValueError(f"no fitting subgraph for size_budget {size_budget} found")
             self.parent_job.dataset = self.parent_job.subsets[subset_index]
             conf = self.parent_job.modify_dataset_config(subset_index, conf)
 
