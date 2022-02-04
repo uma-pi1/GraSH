@@ -117,8 +117,10 @@ class HyperBandSearchJob(AutoSearchJob):
         Modify the dataset part of a given config by replacing with the subset data.
         :return: modified config
         """
-        path_to_subsets = os.path.join("subsets", "k-core")
         subset_stats = self.subset_stats[subset_index]
+        if subset_stats["name"] == "":
+            return config
+        path_to_subsets = os.path.join("subsets", "k-core")
         config.set("dataset.num_entities", subset_stats["num_entities"])
         config.set("dataset.num_relations", subset_stats["num_relations"])
         config.set(
