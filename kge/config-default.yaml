@@ -649,6 +649,12 @@ hyperband_search:
   # - triples_and_entities: relative amount of training triples * relative amount of entities
   # - auto: use estimated power usage if provided, otherwise triples_and_entities
   cost_metric: "auto"
+
+  # Only relevant for the dataset variant
+  # amount of negatves are scaled down
+  # to avoid to few negatives set a minimum percantage of negatives to use
+  # to turn off scaling set min_negatives_percentage to 1.0
+  min_negatives_percentage: 0.01
   
   # Possible options are:
   # - 'both': dynamically change epochs and dataset size (50-50)

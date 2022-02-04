@@ -253,11 +253,15 @@ class HyperBandWorker(Worker):
 
             # downscale number of negatives
             number_samples_s = parameters.get("negative_sampling.num_samples.s")
+            negatives_scaler = max(
+                self.parent_job.subset_stats[subset_index]["relative_entities"],
+                self.parent_job.config.get("hyperband_search.min_negatives_percentage")
+            )
             conf.set("negative_sampling.num_samples.s",
-                     math.ceil(number_samples_s * self.parent_job.subset_stats[subset_index]["relative_entities"]))
+                     math.ceil(number_samples_s * negatives_scaler))
             number_samples_o = parameters.get("negative_sampling.num_samples.o")
             conf.set("negative_sampling.num_samples.o",
-                     math.ceil(number_samples_o * self.parent_job.subset_stats[subset_index]["relative_entities"]))
+                     math.ceil(number_samples_o * negatives_scaler))
 
             # reuse the predecessor model checkpoint if available to keep initialization
             if sh_iter != '00':
