@@ -119,6 +119,7 @@ class HyperBandSearchJob(AutoSearchJob):
         """
         subset_stats = self.subset_stats[subset_index]
         if subset_stats["name"] == "":
+            config.set("dataset.files.test.filename", "test.del")
             return config
         path_to_subsets = os.path.join("subsets", "k-core")
         config.set("dataset.num_entities", subset_stats["num_entities"])
@@ -148,10 +149,10 @@ class HyperBandSearchJob(AutoSearchJob):
             os.path.join(path_to_subsets, f"valid{subset_stats['name']}.del")
         )
         # only set test set for original dataset. Use the valid sets for all others.
-        if subset_stats['name'] == '':
-            config.set("dataset.files.test.filename", "test.del")
-        else:
-            config.set("dataset.files.test.filename", f"valid{subset_stats['name']}.del")
+        config.set(
+            "dataset.files.test.filename",
+            os.path.join(path_to_subsets, f"valid{subset_stats['name']}.del")
+        )
         return config
 
     def register_trial(self, parameters=None):
