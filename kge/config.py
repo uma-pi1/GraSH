@@ -778,6 +778,9 @@ def _process_deprecated_options(options: Dict[str, Any]):
                     renamed_keys.add(key)
         return renamed_keys
 
+    # 04.02.22
+    delete_key_with_value("hyperband_search.num_workers", 1)
+
     # 08.09.21
     rename_key("entity_ranking.tie_handling", "entity_ranking.tie_handling.type")
 

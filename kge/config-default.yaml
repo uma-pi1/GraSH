@@ -629,9 +629,6 @@ hyperband_search:
   # Random seed for generating the trial configs
   seed: 0
   
-  # todo: do we support multiple workers?
-  num_workers: 1
-  
   # Maximal number of successive halving rounds. Min budget is calculated from this value.
   max_sh_rounds: 5
   
@@ -644,6 +641,14 @@ hyperband_search:
   
   # Eta for size and epoch budget. Budget will be shared equally between size and epochs.
   eta: 4
+
+  # Only relevant for the dataset variant
+  # Metric to select subgraph
+  # - power_usage: estimated power usage of subgraph (needs to be provided manually)
+  # - triples: amount of training triples in the subgraphs
+  # - triples_and_entities: relative amount of training triples * relative amount of entities
+  # - auto: use estimated power usage if provided, otherwise triples_and_entities
+  cost_metric: "auto"
   
   # Possible options are:
   # - 'both': dynamically change epochs and dataset size (50-50)

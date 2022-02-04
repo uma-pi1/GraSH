@@ -18,6 +18,28 @@ from argparse import Namespace
 import os
 import yaml
 import shutil
+from collections import defaultdict
+
+
+class HyperBandPatch(HyperBand):
+    def __init__(self, free_devices, configspace=None,
+                 eta=3, min_budget=0.01, max_budget=1,
+                 **kwargs):
+        self.free_devices = free_devices
+        self.assigned_devices = defaultdict(lambda:  None)
+        super(HyperBandPatch, self).__init__(configspace, eta, min_budget, max_budget, **kwargs)
+
+    def _submit_job(self, config_id, config, budget):
+        with self.thread_cond:
+            self.assigned_devices[config_id] = self.free_devices.pop()
+            config["job.device"] = self.assigned_devices[config_id]
+        super(HyperBandPatch, self)._submit_job(config_id, config, budget)
+
+    def job_callback(self, job):
+        with self.thread_cond:
+            self.free_devices.append(self.assigned_devices[job.id])
+            del self.assigned_devices[job.id]
+        super(HyperBandPatch, self).job_callback(job)
 
 
 class HyperBandSearchJob(AutoSearchJob):
@@ -45,7 +67,7 @@ class HyperBandSearchJob(AutoSearchJob):
         self.name_server.start()
 
         # Create workers (dummy logger to avoid output overhead from HPBandSter)
-        for i in range(self.config.get("hyperband_search.num_workers")):
+        for i in range(self.config.get("search.num_workers")):
             w = HyperBandWorker(
                 nameserver=self.config.get("hyperband_search.host"),
                 logger=logging.getLogger('dummy'),
@@ -59,6 +81,7 @@ class HyperBandSearchJob(AutoSearchJob):
 
         if self.config.get("hyperband_search.variant") != "epochs":
             # compute relative sizes and costs for the available subsets
+            cost_metric = self.config.get("hyperband_search.cost_metric")
             self.subset_stats = self.config.get("hyperband_search.subsets")
             for i in range(len(self.subset_stats)):
                 self.subset_stats[i]["relative_entities"] = \
@@ -66,11 +89,17 @@ class HyperBandSearchJob(AutoSearchJob):
                 self.subset_stats[i]["relative_train"] = \
                     self.subset_stats[i]["num_train_triples"] / self.subset_stats[0]["num_train_triples"]
                 # use custom power estimate if available, else compute it
-                if "estimated_power_usage" in self.subset_stats[i]:
+                if cost_metric == "power_usage" and "estimated_power_usage" not in self.subset_stats[i]:
+                    raise ValueError("Estimated power usage not provided. Selection by power usage not possible.")
+                if "estimated_power_usage" in self.subset_stats[i] and cost_metric in ["auto", "power_usage"]:
                     self.subset_stats[i]["relative_costs"] = self.subset_stats[i]["estimated_power_usage"]
-                else:
+                elif cost_metric in ["auto", "triples_and_entities"]:
                     self.subset_stats[i]["relative_costs"] = \
                         self.subset_stats[i]["relative_entities"] * self.subset_stats[i]["relative_train"]
+                elif cost_metric == "triples":
+                    self.subset_stats[i]["relative_costs"] = self.subset_stats[i]["relative_train"]
+                else:
+                    raise ValueError(f"Hyperband cost metric {cost_metric} is not supported.")
 
             # load subgraph datasets
             self.subsets = list()
@@ -133,7 +162,8 @@ class HyperBandSearchJob(AutoSearchJob):
         self.init_search()
 
         # Configure the job
-        hpb = HyperBand(
+        hpb = HyperBandPatch(
+            free_devices=self.free_devices,
             configspace=self.workers[0].get_configspace(self.config, self.config.get("hyperband_search.seed")),
             run_id=self.config.get("hyperband_search.run_id"),
             nameserver=self.config.get("hyperband_search.host"),
@@ -142,9 +172,11 @@ class HyperBandSearchJob(AutoSearchJob):
                                      self.config.get("hyperband_search.max_sh_rounds") - 1),
             max_budget= 1
         )
+
         # Run it
+        print("run hpo search")
         res = hpb.run(n_iterations=self.config.get("hyperband_search.num_hpb_iter"),
-                      min_n_workers=self.config.get("hyperband_search.num_workers"))
+                      min_n_workers=self.config.get("search.num_workers"))
 
         # Shut it down
         hpb.shutdown(shutdown_workers=True)
