@@ -12,7 +12,8 @@ import math
 import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
 import hpbandster.core.nameserver as hpns
-from hpbandster.optimizers import HyperBand as HyperBand
+import hpbandster.core.result as hpres
+from hpbandster.optimizers import HyperBand
 from hpbandster.core.worker import Worker
 from argparse import Namespace
 import os
@@ -184,6 +185,9 @@ class HyperBandSearchJob(AutoSearchJob):
         :return:
         """
         self.init_search()
+        # previous_run = hpres.logged_results_to_HBS_result("test-hpo")
+        result_logger = hpres.json_result_logger(directory=self.config.folder,
+                                                 overwrite=True)
 
         # Configure the job
         hpb = HyperBandPatch(
@@ -191,6 +195,8 @@ class HyperBandSearchJob(AutoSearchJob):
             configspace=self.workers[0].get_configspace(self.config, self.config.get("hyperband_search.seed")),
             run_id=self.config.get("hyperband_search.run_id"),
             nameserver=self.config.get("hyperband_search.host"),
+            result_logger=result_logger,
+            # previous_result=previous_run,
             eta=self.config.get("hyperband_search.eta"),
             min_budget= 1 / math.pow(self.config.get("hyperband_search.eta"),
                                      self.config.get("hyperband_search.max_sh_rounds") - 1),
@@ -312,6 +318,7 @@ class HyperBandWorker(Worker):
 
         # todo: make this less hacky
         # todo: also save a checkpoint for the hyperband search, to avoid this
+        # todo: this may work for successive halving but will fail for any other approach
         # check if last checkpoint in folder is > max_epochs to skip, to avoid loading
         # of checkpoint
         last_checkpoint_number = conf.last_checkpoint_number()
