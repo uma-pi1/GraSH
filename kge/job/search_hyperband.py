@@ -70,28 +70,6 @@ class HyperBandSearchJob(AutoSearchJob):
         # Start the server
         self.name_server.start()
 
-        #worker_futures = []
-        # Create workers (dummy logger to avoid output overhead from HPBandSter)
-        for i in range(self.config.get("search.num_workers")):
-            w = HyperBandWorker(
-                nameserver=self.config.get("hyperband_search.host"),
-                logger=logging.getLogger('dummy'),
-                run_id=self.config.get("hyperband_search.run_id"),
-                job_config=self.config,
-                parent_job=self,
-                id=i
-            )
-            if self.config.get("search.num_workers") == 1:
-                w.run(background=True)
-            else:
-                # todo: figure out why the process pool is not starting the jobs
-                p = mp.Process(target=w.run, args=(False,))
-                self.processes.append(p)
-                p.start()
-                #future = self.process_pool.submit(w.run, w, False)
-                #worker_futures.append(future)
-            self.workers.append(w)
-
         if self.config.get("hyperband_search.variant") != "epochs":
             # compute relative sizes and costs for the available subsets
             cost_metric = self.config.get("hyperband_search.cost_metric")
@@ -121,6 +99,28 @@ class HyperBandSearchJob(AutoSearchJob):
                 config_custom_data = self.modify_dataset_config(i, config_custom_data)
                 custom_dataset = Dataset.create(config_custom_data)
                 self.subsets.append(custom_dataset)
+
+        # worker_futures = []
+        # Create workers (dummy logger to avoid output overhead from HPBandSter)
+        for i in range(self.config.get("search.num_workers")):
+            w = HyperBandWorker(
+                nameserver=self.config.get("hyperband_search.host"),
+                logger=logging.getLogger('dummy'),
+                run_id=self.config.get("hyperband_search.run_id"),
+                job_config=self.config,
+                parent_job=self,
+                id=i
+            )
+            if self.config.get("search.num_workers") == 1:
+                w.run(background=True)
+            else:
+                # todo: figure out why the process pool is not starting the jobs
+                p = mp.Process(target=w.run, args=(False,))
+                self.processes.append(p)
+                p.start()
+                #future = self.process_pool.submit(w.run, w, False)
+                #worker_futures.append(future)
+            self.workers.append(w)
 
 
     def modify_dataset_config(self, subset_index, config):
