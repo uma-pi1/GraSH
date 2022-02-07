@@ -103,10 +103,13 @@ class HyperBandSearchJob(AutoSearchJob):
 
         # worker_futures = []
         # Create workers (dummy logger to avoid output overhead from HPBandSter)
+        worker_logger = logging.getLogger("dummy")
+        worker_logger.setLevel(logging.DEBUG)
         for i in range(self.config.get("search.num_workers")):
             w = HyperBandWorker(
                 nameserver=self.config.get("hyperband_search.host"),
-                logger=logging.getLogger('dummy'),
+                #logger=logging.getLogger('dummy'),
+                logger=worker_logger,
                 run_id=self.config.get("hyperband_search.run_id"),
                 job_config=self.config,
                 parent_job=self,
@@ -116,13 +119,13 @@ class HyperBandSearchJob(AutoSearchJob):
                 w.run(background=True)
             else:
                 # todo: figure out why the process pool is not starting the jobs
+                print(f"starting process hpb-worker-process {i}")
                 p = mp.Process(target=w.run, args=(False,))
                 self.processes.append(p)
                 p.start()
                 #future = self.process_pool.submit(w.run, w, False)
                 #worker_futures.append(future)
             self.workers.append(w)
-
 
     def modify_dataset_config(self, subset_index, config):
         """
