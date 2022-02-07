@@ -310,6 +310,24 @@ class HyperBandWorker(Worker):
         # save config.yaml
         conf.init_folder()
 
+        # todo: make this less hacky
+        # todo: also save a checkpoint for the hyperband search, to avoid this
+        # check if last checkpoint in folder is > max_epochs to skip, to avoid loading
+        # of checkpoint
+        last_checkpoint_number = conf.last_checkpoint_number()
+        if last_checkpoint_number is not None and last_checkpoint_number >= conf.get("train.max_epochs"):
+            # we need to get the best mrr here
+            valid_metric = conf.get("valid.metric")
+            best_score = -1
+            with open(os.path.join(conf.folder, "trace.yaml")) as trace:
+                for line in trace.readlines():
+                    if valid_metric not in line:
+                        continue
+                    line = yaml.load(line, Loader=yaml.SafeLoader)
+                    best_score = max(best_score, line[valid_metric])
+                conf.log(f"Trial {conf.folder} registered with {valid_metric} {best_score}")
+                return {'loss': 1 - best_score, 'info': {}}
+
         # copy last checkpoint from previous sh round to new folder for epoch only variant
         if self.parent_job.config.get("hyperband_search.variant") == 'epochs' and sh_iter != '00':
             predecessor_trial_id = f"{hpb_iter}{str('{:02d}'.format(int(sh_iter) - 1))}{config_no}"
