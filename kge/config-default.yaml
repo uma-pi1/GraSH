@@ -651,6 +651,10 @@ hyperband_search:
   cost_metric: "auto"
 
   # Only relevant for the dataset variant
+  # keep pretrained embeddings of smaller cores in higher rounds
+  keep_pretrained: false
+
+  # Only relevant for the dataset variant
   # amount of negatves are scaled down
   # to avoid to few negatives set a minimum percantage of negatives to use
   # to turn off scaling set min_negatives_percentage to 1.0

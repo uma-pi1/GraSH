@@ -303,7 +303,10 @@ class HyperBandWorker(Worker):
             # reuse the predecessor model checkpoint if available to keep initialization
             if sh_iter != '00':
                 predecessor_trial_id = f"{hpb_iter}{str('{:02d}'.format(int(sh_iter) - 1))}{config_no}"
-                path_to_model = f"{os.path.dirname(conf.folder)}/{predecessor_trial_id}/model_00000.pt"
+                if conf.get("hyperband_search.keep_pretrained"):
+                    path_to_model = os.path.join(f"{os.path.dirname(conf.folder)}", f"{predecessor_trial_id}", f"model_best.pt")
+                else:
+                    path_to_model = os.path.join(f"{os.path.dirname(conf.folder)}", f"{predecessor_trial_id}", f"model_00000.pt")
                 conf.set("lookup_embedder.pretrain.model_filename", path_to_model)
 
         # set the number of epochs
@@ -358,7 +361,10 @@ class HyperBandWorker(Worker):
 
         # save package checkpoint
         args = Namespace()
-        args.checkpoint = f"{conf.folder}/checkpoint_00000.pt"
+        if conf.get("hyperband_search.keep_pretrained"):
+            args.checkpoint = f"{conf.folder}/checkpoint_best.pt"
+        else:
+            args.checkpoint = f"{conf.folder}/checkpoint_00000.pt"
         args.file = None
         package_model(args)
         best_score = best[1]['metric_value']
