@@ -21,6 +21,7 @@ import yaml
 import shutil
 from collections import defaultdict
 import torch.multiprocessing as mp
+from multiprocessing import Manager
 
 
 class HyperBandPatch(HyperBand):
@@ -105,6 +106,8 @@ class HyperBandSearchJob(AutoSearchJob):
         # Create workers (dummy logger to avoid output overhead from HPBandSter)
         worker_logger = logging.getLogger("dummy")
         worker_logger.setLevel(logging.DEBUG)
+        manager = Manager()
+        self.id_dict = manager.dict()
         for i in range(self.config.get("search.num_workers")):
             w = HyperBandWorker(
                 nameserver=self.config.get("hyperband_search.host"),
@@ -113,6 +116,7 @@ class HyperBandSearchJob(AutoSearchJob):
                 run_id=self.config.get("hyperband_search.run_id"),
                 job_config=self.config,
                 parent_job=self,
+                id_dict=self.id_dict,
                 id=i
             )
             if self.config.get("search.num_workers") == 1:
@@ -226,6 +230,7 @@ class HyperBandWorker(Worker):
     def __init__(self, *args, **kwargs):
         self.job_config = kwargs.pop('job_config')
         self.parent_job = kwargs.pop('parent_job')
+        self.id_dict = kwargs.pop('id_dict')
         super().__init__(*args, **kwargs)
         self.next_trial_no = 0
 
@@ -246,11 +251,11 @@ class HyperBandWorker(Worker):
         config_no = str('{:04d}'.format(config_id[2]))
 
         if (hpb_iter, config_no) in self.parent_job.id_dict:
-            self.parent_job.id_dict[(hpb_iter, config_no)] += 1
+            self.id_dict[(hpb_iter, config_no)] += 1
         else:
-            self.parent_job.id_dict[(hpb_iter, config_no)] = 0
+            self.id_dict[(hpb_iter, config_no)] = 0
 
-        sh_iter = str('{:02d}'.format(self.parent_job.id_dict[(hpb_iter, config_no)]))
+        sh_iter = str('{:02d}'.format(self.id_dict[(hpb_iter, config_no)]))
 
         # compute new result
         trial_no = f"{hpb_iter}{sh_iter}{config_no}"
