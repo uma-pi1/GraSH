@@ -279,8 +279,18 @@ class HyperBandWorker(Worker):
             epochs += self.parent_job.config.get("hyperband_search.epoch_budget_tolerance")[int(sh_iter)]
         elif self.parent_job.config.get("hyperband_search.variant") == 'epochs':
             epoch_budget = budget
-            epochs = math.floor(self.parent_job.config.get("hyperband_search.max_epoch_budget") * epoch_budget)
+            epochs = self.parent_job.config.get("hyperband_search.max_epoch_budget") * epoch_budget
             epochs += self.parent_job.config.get("hyperband_search.epoch_budget_tolerance")[int(sh_iter)]
+            print("num epochs", epochs)
+            if epochs < 1:
+                max_batches = len(self.parent_job.dataset.split("train"))/conf.get("train.batch_size") * epoch_budget
+                if "distributed" in conf.get("model"):
+                    max_batches /= conf.get("job.distributed.num_partitions")
+                max_batches = max(1, math.floor(max_batches))
+                conf.set("train.max_batches", max_batches)
+                epochs = 1
+            epochs = math.floor(epochs)
+            print("num epochs", epochs)
 
         if self.parent_job.config.get("hyperband_search.variant") != 'epochs':
             # determine and set the dataset to use based on the budget

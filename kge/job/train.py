@@ -90,6 +90,7 @@ class TrainingJob(TrainingOrEvaluationJob):
         self.trace_batch: bool = self.config.get("train.trace_level") == "batch"
         self.epoch: int = 0
         self.is_forward_only = forward_only
+        self.max_batches = self.config.get("train.max_batches")
 
         if not self.is_forward_only:
             self.model.train()
@@ -546,6 +547,9 @@ class TrainingJob(TrainingOrEvaluationJob):
             forward_time += batch_forward_time
             backward_time += batch_backward_time
             optimizer_time += batch_optimizer_time
+
+            if 0 < self.max_batches < batch_index:
+                break
 
         # all done; now trace and log
         epoch_time += time.time()

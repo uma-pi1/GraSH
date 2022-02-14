@@ -808,6 +808,8 @@ class TrainingJobNegativeSamplingDistributed(TrainingJobNegativeSampling):
                 ps_wait_time += batch_result.ps_wait_time
 
                 batch_index += 1
+                if 0 < self.max_batches < batch_index:
+                    break
 
             # all done; now trace and log
             epoch_time += time.time()

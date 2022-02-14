@@ -116,7 +116,7 @@ hyperband_search:
   seed: 2
   num_workers: 1
   max_sh_rounds: 5
-  size_budget_tolerance: 0.0
+  #size_budget_tolerance: 0.0
   epoch_budget_tolerance: [1,1,0,0,0]
   max_epoch_budget: 400
   eta: 4

@@ -248,6 +248,11 @@ train:
   # Maximum number of epochs used for training
   max_epochs: 20
 
+  # Maximum number of batches to train per epoch
+  # relevant for hyperband search to train less than one epoch
+  # default: -1   train full epochs
+  max_batches: -1
+
   # Batch size used for training.
   batch_size: 100
 
