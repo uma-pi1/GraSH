@@ -9,13 +9,14 @@ setup(
     author_email="rgemulla@uni-mannheim.de",
     packages=["kge"],
     install_requires=[
+        "numpy==1.19.*",
         "torch==1.7.1",
         "pyyaml",
         "pandas",
         "argparse",
         "path",
         # please check correct behaviour when updating ax platform version!!
-        "ax-platform==0.1.19",
+        "ax-platform==0.1.19", "botorch==0.4.0", "gpytorch==1.4.2",
         "sqlalchemy",
         "torchviz",
         # LibKGE uses numba typed-dicts which is part of the experimental numba API

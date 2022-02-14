@@ -1,3 +1,12 @@
+#### October 2021
+- [5127cf2](https://github.com/uma-pi1/kge/commit/5127cf287488a3abfc2e8b698fad22085829a9aa): Fix differences in TransE scoring implementations
+
+#### September 2021
+- PR [#224](https://github.com/uma-pi1/kge/pull/224): Take floating point issues into account for tie calculation in entity-ranking (thanks @sfschouten)
+
+#### June 2021
+- [9a4f69a](https://github.com/uma-pi1/kge/commit/9a4f69a806ea775fed13657a3e3cd1c6711a2279): Refactor  time measurement with new timer class
+
 #### March 2021
 - PR [#191](https://github.com/uma-pi1/kge/pull/191): Fix loading of pretrained embeddings with reciprocal relation models
 

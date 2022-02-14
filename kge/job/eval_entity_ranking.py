@@ -1,6 +1,7 @@
 import os
 import math
 import time
+import sys
 
 import torch
 import numpy as np
@@ -23,10 +24,13 @@ class EntityRankingJob(EvaluationJob):
         else:
             self.work_scheduler_client = work_scheduler_client
         self.config.check(
-            "entity_ranking.tie_handling",
+            "entity_ranking.tie_handling.type",
             ["rounded_mean_rank", "best_rank", "worst_rank"],
         )
-        self.tie_handling = self.config.get("entity_ranking.tie_handling")
+        self.tie_handling = self.config.get("entity_ranking.tie_handling.type")
+
+        self.tie_atol = float(self.config.get("entity_ranking.tie_handling.atol"))
+        self.tie_rtol = float(self.config.get("entity_ranking.tie_handling.rtol"))
         if self.config.get("entity_ranking.labels_on_cpu"):
             self.label_device = "cpu"
         else:
@@ -277,13 +281,41 @@ class EntityRankingJob(EvaluationJob):
 
                 # compute true scores beforehand, since we can't get them from a chunked
                 # score table
-                o_true_scores = self.model.score_spo(s_mapped, p, o_mapped, "o").view(-1)
-                s_true_scores = self.model.score_spo(s_mapped, p, o_mapped, "s").view(-1)
+                # o_true_scores = self.model.score_spo(s_mapped, p, o_mapped, "o").view(-1)
+                # s_true_scores = self.model.score_spo(s_mapped, p, o_mapped, "s").view(-1)
+                unique_o, unique_o_inverse = torch.unique(o_mapped, return_inverse=True)
+                o_true_scores = torch.gather(
+                    self.model.score_sp(s_mapped, p, unique_o),
+                    1,
+                    unique_o_inverse.view(-1, 1),
+                ).view(-1)
+                unique_s, unique_s_inverse = torch.unique(s_mapped, return_inverse=True)
+                s_true_scores = torch.gather(
+                    self.model.score_po(p, o_mapped, unique_s),
+                    1,
+                    unique_s_inverse.view(-1, 1),
+                ).view(-1)
             else:
                 # compute true scores beforehand, since we can't get them from a chunked
                 # score table
-                o_true_scores = self.model.score_spo(s, p, o, "o").view(-1)
-                s_true_scores = self.model.score_spo(s, p, o, "s").view(-1)
+                # o_true_scores = self.model.score_spo(s, p, o, "o").view(-1)
+                # s_true_scores = self.model.score_spo(s, p, o, "s").view(-1)
+                # scoring with spo vs sp and po can lead to slight differences for ties
+                # due to floating point issues.
+                # We use score_sp and score_po to stay consistent with scoring used for
+                # further evaluation.
+                unique_o, unique_o_inverse = torch.unique(o, return_inverse=True)
+                o_true_scores = torch.gather(
+                    self.model.score_sp(s, p, unique_o),
+                    1,
+                    unique_o_inverse.view(-1, 1),
+                ).view(-1)
+                unique_s, unique_s_inverse = torch.unique(s, return_inverse=True)
+                s_true_scores = torch.gather(
+                    self.model.score_po(p, o, unique_s),
+                    1,
+                    unique_s_inverse.view(-1, 1),
+                ).view(-1)
 
             # default dictionary storing rank and num_ties for each key in rankings
             # as list of len 2: [rank, num_ties]
@@ -347,6 +379,43 @@ class EntityRankingJob(EvaluationJob):
                     scores = self.model.score_sp_po(s, p, o, targets)
                 scores_sp = scores[:, :len_targets]
                 scores_po = scores[:, len_targets:]
+
+                # check that scoring is consistent up to configured tolerance
+                # if this is not the case, evaluation metrics may be artificially inflated
+                close_check = torch.allclose(
+                    scores_sp[o_in_target_mask, o_in_target],
+                    o_true_scores[o_in_target_mask],
+                    rtol=self.tie_rtol,
+                    atol=self.tie_atol,
+                )
+                close_check &= torch.allclose(
+                    scores_po[s_in_target_mask, s_in_target],
+                    s_true_scores[s_in_target_mask],
+                    rtol=self.tie_rtol,
+                    atol=self.tie_atol,
+                )
+                if not close_check:
+                    diff_a = torch.abs(
+                        scores_sp[o_in_target_mask, o_in_target]
+                        - o_true_scores[o_in_target_mask]
+                    )
+                    diff_b = torch.abs(
+                        scores_po[s_in_target_mask, s_in_target]
+                        - s_true_scores[s_in_target_mask]
+                    )
+                    diff_all = torch.cat((diff_a, diff_b))
+                    self.config.log(
+                        f"Tie-handling: mean difference between scores was: {diff_all.mean()}."
+                    )
+                    self.config.log(
+                        f"Tie-handling: max difference between scores was: {diff_all.max()}."
+                    )
+                    error_message = "Error in tie-handling. The scores assigned to a triple by the SPO and SP_/_PO scoring implementations were not 'equal' given the configured tolerances. Verify the model's scoring implementations or consider increasing tie-handling tolerances."
+                    if self.config.get("entity_ranking.tie_handling.warn_only"):
+                        print(error_message, file=sys.stderr)
+                    else:
+                        raise ValueError(error_message)
+
 
                 # replace the precomputed true_scores with the ones occurring in the
                 # scores matrix to avoid floating point issues
@@ -721,9 +790,8 @@ num_ties for each true score.
         s_rank, s_num_ties = self._get_ranks_and_num_ties(scores_po, s_true_scores)
         return s_rank, s_num_ties, o_rank, o_num_ties, scores_sp, scores_po
 
-    @staticmethod
     def _get_ranks_and_num_ties(
-        scores: torch.Tensor, true_scores: torch.Tensor
+        self, scores: torch.Tensor, true_scores: torch.Tensor
     ) -> (torch.Tensor, torch.Tensor):
         """Returns rank and number of ties of each true score in scores.
 
@@ -741,8 +809,12 @@ num_ties for each true score.
 
         # Determine how many scores are greater than / equal to each true answer (in its
         # corresponding row of scores)
-        rank = torch.sum(scores > true_scores.view(-1, 1), dim=1, dtype=torch.long)
-        num_ties = torch.sum(scores == true_scores.view(-1, 1), dim=1, dtype=torch.long)
+        is_close = torch.isclose(
+            scores, true_scores.view(-1, 1), rtol=self.tie_rtol, atol=self.tie_atol
+        )
+        is_greater = scores > true_scores.view(-1, 1)
+        num_ties = torch.sum(is_close, dim=1, dtype=torch.long)
+        rank = torch.sum(is_greater & ~is_close, dim=1, dtype=torch.long)
         return rank, num_ties
 
     def _get_ranks(self, rank: torch.Tensor, num_ties: torch.Tensor) -> torch.Tensor:
@@ -784,7 +856,12 @@ num_ties for each true score.
         )
 
         hits_at_k = (
-            (torch.cumsum(rank_hist[: max(self.hits_at_k_s)], dim=0, dtype=torch.float64) / n).tolist()
+            (
+                torch.cumsum(
+                    rank_hist[: max(self.hits_at_k_s)], dim=0, dtype=torch.float64
+                )
+                / n
+            ).tolist()
             if n > 0.0
             else [0.0] * max(self.hits_at_k_s)
         )

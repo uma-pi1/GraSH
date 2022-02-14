@@ -21,6 +21,7 @@ from kge.job.trace import format_trace_entry
 from typing import Any, Callable, Dict, List, Optional
 from kge.util.metric import Metric
 from kge.misc import init_from
+from kge.util.monitoring import monitor_gpus
 
 SLOTS = [0, 1, 2]
 S, P, O = SLOTS
@@ -169,6 +170,12 @@ class TrainingJob(TrainingOrEvaluationJob):
     def _run(self) -> None:
         """Start/resume the training job and run to completion."""
 
+        # fniesel: start GPU monitoring
+        gpu_monitor_process = torch.multiprocessing.Process(
+            target=monitor_gpus, args=(self.config.folder, 1), daemon=True
+        )
+        gpu_monitor_process.start()
+
         if self.is_forward_only:
             raise Exception(
                 f"{self.__class__.__name__} was initialized for forward only. You can only call run_epoch()"
@@ -265,6 +272,9 @@ class TrainingJob(TrainingOrEvaluationJob):
                 self.kge_lr_scheduler.step(lr_metric)
 
 
+        # fniesel: stop GPU monitoring
+        gpu_monitor_process.terminate()
+
         self.trace(event="train_completed")
 
     def handle_validation(self, metric_name):
@@ -303,7 +313,6 @@ class TrainingJob(TrainingOrEvaluationJob):
                     "train.checkpoint.keep_init"
                 ):
                     self._delete_checkpoint(delete_checkpoint_epoch)
-
 
     def _delete_checkpoint(self, checkpoint_id):
         """Try to delete checkpoint specified by id"""

@@ -564,7 +564,9 @@ entity_ranking:
   # mean_reciprocal_rank_filtered_with_test.
   filter_with_test: True
 
-  # If set, use a sample of entities instead of ranking against all entities.
+  tie_handling:
+
+    # If set, use a sample of entities instead of ranking against all entities.
   # In more detail, for each batch, this many ranking targets will be sampled uniformly
   # and without replacement from the set of entities. Since this changes all metrics,
   # their name is changed to {metric_name}_against_{rank_against}.
@@ -577,21 +579,29 @@ entity_ranking:
       sampling_type: "frequency"
 
   # How to handle cases with ties between the correct answer and other answers, e.g.,
-  #  Query: (s, p, ?).
-  #  Answers and score: a:10, b:10, c:10, d:11, e:9
-  #  Correct: 'a'.
-  #
-  # Possible options are:
-  # - worst_rank:        Use the highest rank of all answers that have the same
-  #                      score as the correct answer. In example: 4.
-  # - best_rank:         Use the lowest rank of all answers that have the same
-  #                      score as the correct answer (competition scoring). In
-  #                      example: 2.
-  #                      DO NOT USE THIS OPTION, it leads to misleading evaluation
-  #                      results. See https://arxiv.org/pdf/1911.03903.pdf
-  # - rounded_mean_rank: Average between worst and best rank, rounded up
-  #                      (rounded fractional ranking). In example: 3.
-  tie_handling: rounded_mean_rank
+    #  Query: (s, p, ?).
+    #  Answers and score: a:10, b:10, c:10, d:11, e:9
+    #  Correct: 'a'.
+    #
+    # Possible options are:
+    # - worst_rank:        Use the highest rank of all answers that have the same
+    #                      score as the correct answer. In example: 4.
+    # - best_rank:         Use the lowest rank of all answers that have the same
+    #                      score as the correct answer (competition scoring). In
+    #                      example: 2.
+    #                      DO NOT USE THIS OPTION, it leads to misleading evaluation
+    #                      results. See https://arxiv.org/pdf/1911.03903.pdf
+    # - rounded_mean_rank: Average between worst and best rank, rounded up
+    #                      (rounded fractional ranking). In example: 3.
+    type: rounded_mean_rank
+
+    # Tie detection tolerances. These two values determine when scores are close enough to be counted as ties;
+    # see torch.isclose for details.
+    atol: 1e-05
+    rtol: 1e-04
+
+    # Only warn (don't abort) if ties are not in detection tolerance.
+    warn_only: true
 
   # Compute Hits@K for these choices of K
   hits_at_k_s: [1, 3, 10, 50, 100, 200, 300, 400, 500, 1000]
@@ -628,7 +638,7 @@ training_loss:
 # Options of hyperparameter search jobs (job.type=="search").
 search:
   # Type of search job (see respective configuration key). LibKGE ships with the
-  # following jobs: manual_search, grid_search, ax_search
+  # following jobs: manual_search, grid_search, ax_search, hyperband_search
   type: ax_search
 
   # Maximum number of parallel training jobs to run during a search.
@@ -696,6 +706,70 @@ ax_search:
   # https://ax.dev/api/service.html#module-ax.service.ax_client
   parameters: []
   parameter_constraints: []
+
+# Dynamic search job that picks configurations using HpBandSter
+hyperband_search:
+  class_name: HyperBandSearchJob
+
+  # Nameserver configuration required by HPBandSter
+  run_id: ''
+  host: ''
+  port: ''
+
+  # Random seed for generating the trial configs
+  seed: 0
+
+  # Maximal number of successive halving rounds. Min budget is calculated from this value.
+  max_sh_rounds: 5
+
+  # Epoch bdget tolerance is added to the respective round's epoch budget. Index 0 refers
+  # to the first and last index to the last SH round.
+  epoch_budget_tolerance: [0,0,0,0,0]
+
+  # Maximum epochs for training. Will be scaled down based on the SH budget in each round.
+  max_epoch_budget: 400
+
+  # Eta for size and epoch budget. Budget will be shared equally between size and epochs.
+  eta: 4
+
+  # Only relevant for the dataset variant
+  # Metric to select subgraph
+  # - power_usage: estimated power usage of subgraph (needs to be provided manually)
+  # - triples: amount of training triples in the subgraphs
+  # - triples_and_entities: relative amount of training triples * relative amount of entities
+  # - auto: use estimated power usage if provided, otherwise triples_and_entities
+  cost_metric: "auto"
+
+  # Only relevant for the dataset variant
+  # keep pretrained embeddings of smaller cores in higher rounds
+  keep_pretrained: false
+
+  # Only relevant for the dataset variant
+  # amount of negatves are scaled down
+  # to avoid to few negatives set a minimum percantage of negatives to use
+  # to turn off scaling set min_negatives_percentage to 1.0
+  min_negatives_percentage: 0.01
+
+  # Possible options are:
+  # - 'both': dynamically change epochs and dataset size (50-50)
+  # - 'epochs': only change epochs and use full dataset
+  # - 'dataset': only change dataset sizes and use static number of epochs
+  variant: 'dataset'
+
+  # Information about the available subsets. This should include:
+  # - name: name of suffix which is used in the subset filenames (use '' for full data)
+  # - num_entities: number of entities contained in the subset
+  # - num_relations: number of relations contained in the subset
+  # - num_train_triples: number of training triples contained in the subset
+  # - num_valid_triples: number of validation triples contained in the subset
+  # - estimated_power_usage: optional parameter for custom power estimates
+  subsets: []
+
+  # Number of Hyperband iterations (if set to 1, the search equals successive halving)
+  num_hpb_iter: 1
+
+  # Search space definition passed to HPBandSter
+  parameters: []
 
 
 ## USER PARAMETERS #####################################################################

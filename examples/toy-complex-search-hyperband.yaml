@@ -1,0 +1,34 @@
+job.type: search
+dataset.name: toy
+
+train.optimizer.default.type: Adagrad
+model: complex
+
+search.type: hyperband_search
+hyperband_search:
+  run_id: 'hpb-toy-example'
+  host: '127.0.0.1'
+  port: "None"
+  seed: 1
+  num_workers: 1
+  max_sh_rounds: 3
+  max_epoch_budget: 16
+  epoch_budget_tolerance: [0,0,0]
+  eta: 4
+  variant: 'epochs'
+  subsets: []
+  num_hpb_iter: 1
+  parameters:
+    - name: train.optimizer.default.args.lr
+      type: range
+      bounds: [0.0, 1.0]
+    - name: train.optimizer.default.args.weight_decay
+      type: range
+      bounds: [1.0e-8, 1.0]
+      log_scale: True
+    - name: lookup_embedder.dim
+      type: range
+      bounds: [10, 50]
+      
+train:
+  max_epochs: 5
