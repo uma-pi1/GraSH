@@ -11,6 +11,7 @@ from kge.distributed.parameter_server import init_torch_server, init_lapse_sched
 from kge.distributed.worker_process import WorkerProcessPool
 from kge.distributed.work_scheduler import WorkScheduler
 from kge.distributed.misc import get_num_keys
+from threading import main_thread, current_thread
 
 import torch
 from torch import multiprocessing as mp
@@ -144,7 +145,13 @@ def create_and_run_distributed(
         if worker_process_pool is not None:
             worker_process_pool.kill()
         exit(0)
-    signal(SIGINT, kill_processes)
+
+    # check in which thread we are
+    # todo: find a better way. This is only needed for hyperband search
+    if main_thread() == current_thread():
+        signal(SIGINT, kill_processes)
+    else:
+        warnings.warn("Distributed training not started in python-main thread. This can leave some running processes on failure.")
 
     if config.get("job.type") == "train":
         # start hardware monitoring

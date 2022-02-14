@@ -564,9 +564,7 @@ entity_ranking:
   # mean_reciprocal_rank_filtered_with_test.
   filter_with_test: True
 
-  tie_handling:
-
-    # If set, use a sample of entities instead of ranking against all entities.
+  # If set, use a sample of entities instead of ranking against all entities.
   # In more detail, for each batch, this many ranking targets will be sampled uniformly
   # and without replacement from the set of entities. Since this changes all metrics,
   # their name is changed to {metric_name}_against_{rank_against}.
@@ -578,6 +576,7 @@ entity_ranking:
     combined_options:
       sampling_type: "frequency"
 
+  tie_handling:
   # How to handle cases with ties between the correct answer and other answers, e.g.,
     #  Query: (s, p, ?).
     #  Answers and score: a:10, b:10, c:10, d:11, e:9

@@ -88,6 +88,10 @@ class WorkerProcess(mp.get_context("spawn").Process):
     ):
         # rank = rank + 1
         daemon = config.get("train.num_workers") <= 0 and config.get("eval.num_workers") <= 0
+        # todo: we only set daemon false here as otherwise it does not work with
+        #  hyperband search
+        #  instead we could just move gpu monitoring to the main trainer process again
+        daemon = False
         super().__init__(daemon=daemon, name=f"Worker #{rank}")
         self.rank = rank
         self.num_keys = get_num_keys(config, dataset)

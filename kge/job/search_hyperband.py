@@ -231,6 +231,7 @@ class HyperBandWorker(Worker):
         self.job_config = kwargs.pop('job_config')
         self.parent_job = kwargs.pop('parent_job')
         self.id_dict = kwargs.pop('id_dict')
+        self.search_worker_id = kwargs.get('id')
         super().__init__(*args, **kwargs)
         self.next_trial_no = 0
 
@@ -353,6 +354,14 @@ class HyperBandWorker(Worker):
                 if filename.endswith(".pt") and filename != 'checkpoint_best.pt':
                     shutil.copy(f"{os.path.dirname(conf.folder)}/{predecessor_trial_id}/{filename}",
                                 f"{conf.folder}/{filename}")
+
+        # change port for distributed training
+        if "distributed" in conf.get("model"):
+            print("worker id", self.search_worker_id)
+            conf.set(
+                "job.distributed.master_port",
+                conf.get("job.distributed.master_port") + self.search_worker_id
+            )
 
         # run trial
         best = kge.job.search._run_train_job((
