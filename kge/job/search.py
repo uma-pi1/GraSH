@@ -231,7 +231,7 @@ def _run_train_job(sicnk, device=None):
 
         # force releasing the GPU memory of the job to avoid memory leakage
         # variable job not defined in distributed setting
-        if job in locals():
+        if "job" in locals():
             del job
         gc.collect()
 
