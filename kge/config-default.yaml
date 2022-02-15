@@ -744,6 +744,9 @@ hyperband_search:
   # - auto: use estimated power usage if provided, otherwise triples_and_entities
   cost_metric: "auto"
 
+  # Initialize the models with the same values in each round
+  keep_initialization: true
+
   # Only relevant for the dataset variant
   # keep pretrained embeddings of smaller cores in higher rounds
   keep_pretrained: false

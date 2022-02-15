@@ -319,10 +319,15 @@ class HyperBandWorker(Worker):
             # reuse the predecessor model checkpoint if available to keep initialization
             if sh_iter != '00':
                 predecessor_trial_id = f"{hpb_iter}{str('{:02d}'.format(int(sh_iter) - 1))}{config_no}"
+                path_to_model = ""
+                if conf.get("hyperband_serch.keep_initialization"):
+                    path_to_model = os.path.join(f"{os.path.dirname(conf.folder)}",
+                                                 f"{predecessor_trial_id}",
+                                                 f"model_00000.pt")
                 if conf.get("hyperband_search.keep_pretrained"):
-                    path_to_model = os.path.join(f"{os.path.dirname(conf.folder)}", f"{predecessor_trial_id}", f"model_best.pt")
-                else:
-                    path_to_model = os.path.join(f"{os.path.dirname(conf.folder)}", f"{predecessor_trial_id}", f"model_00000.pt")
+                    path_to_model = os.path.join(f"{os.path.dirname(conf.folder)}",
+                                                 f"{predecessor_trial_id}",
+                                                 f"model_best.pt")
                 conf.set("lookup_embedder.pretrain.model_filename", path_to_model)
 
         # set the number of epochs
@@ -343,27 +348,45 @@ class HyperBandWorker(Worker):
         # todo: this may work for successive halving but will fail for any other approach
         # check if last checkpoint in folder is > max_epochs to skip, to avoid loading
         # of checkpoint
-        last_checkpoint_number = conf.last_checkpoint_number()
-        if last_checkpoint_number is not None and last_checkpoint_number >= conf.get("train.max_epochs"):
+        # last_checkpoint_number = conf.last_checkpoint_number()
+        # if last_checkpoint_number is not None and last_checkpoint_number >= conf.get("train.max_epochs"):
+        valid_metric = conf.get("valid.metric")
+
+        def get_best_score(trace_path):
             # we need to get the best mrr here
-            valid_metric = conf.get("valid.metric")
             best_score = -1
+            max_epoch = -1
+            if not os.path.exists(trace_path):
+                return best_score, max_epoch
             with open(os.path.join(conf.folder, "trace.yaml")) as trace:
                 for line in trace.readlines():
                     if valid_metric not in line:
                         continue
                     line = yaml.load(line, Loader=yaml.SafeLoader)
                     best_score = max(best_score, line[valid_metric])
-                conf.log(f"Trial {conf.folder} registered with {valid_metric} {best_score}")
-                return {'loss': 1 - best_score, 'info': {}}
+                    max_epoch = line["epoch"]
+            return best_score, max_epoch
+
+        if "distributed" in conf.get("model"):
+            trace_path = os.path.join(conf.folder, "worker-0", "trace.yaml")
+        else:
+            trace_path = os.path.join(conf.folder, "trace.yaml")
+        best_score, max_epoch = get_best_score(trace_path)
+        if best_score >= 0 and max_epoch >= conf.get("train.max_epochs"):
+            conf.log(f"Trial {conf.folder} registered with {valid_metric} {best_score}")
+            return {'loss': 1 - best_score, 'info': {}}
 
         # copy last checkpoint from previous sh round to new folder for epoch only variant
         if self.parent_job.config.get("hyperband_search.variant") == 'epochs' and sh_iter != '00':
+            copied = False
             predecessor_trial_id = f"{hpb_iter}{str('{:02d}'.format(int(sh_iter) - 1))}{config_no}"
             for filename in os.listdir(f"{os.path.dirname(conf.folder)}/{predecessor_trial_id}/"):
                 if filename.endswith(".pt") and filename != 'checkpoint_best.pt':
                     shutil.copy(f"{os.path.dirname(conf.folder)}/{predecessor_trial_id}/{filename}",
                                 f"{conf.folder}/{filename}")
+                    copied = True
+            if not copied:
+                conf.log("Could not copy predecessor checkpoint. Starting new round from scratch")
 
         # change port for distributed training
         if "distributed" in conf.get("model"):
@@ -385,14 +408,16 @@ class HyperBandWorker(Worker):
 
         # save package checkpoint
         args = Namespace()
+        args.checkpoint = None
+        if conf.get("hyperband_serch.keep_initialization"):
+            args.checkpoint = f"{conf.folder}/checkpoint_00000.pt"
         if conf.get("hyperband_search.keep_pretrained"):
             args.checkpoint = f"{conf.folder}/checkpoint_best.pt"
-        else:
-            args.checkpoint = f"{conf.folder}/checkpoint_00000.pt"
-        args.file = None
-        package_model(args)
-        best_score = best[1]['metric_value']
+        if args.checkpoint is not None:
+            args.file = None
+            package_model(args)
 
+        best_score = best[1]['metric_value']
         return {'loss': 1 - best_score, 'info': {}}
 
     @staticmethod
