@@ -358,7 +358,7 @@ class HyperBandWorker(Worker):
             max_epoch = -1
             if not os.path.exists(trace_path):
                 return best_score, max_epoch
-            with open(os.path.join(conf.folder, "trace.yaml")) as trace:
+            with open(trace_path) as trace:
                 for line in trace.readlines():
                     if valid_metric not in line:
                         continue
