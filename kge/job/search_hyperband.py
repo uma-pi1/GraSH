@@ -409,7 +409,7 @@ class HyperBandWorker(Worker):
         # save package checkpoint
         args = Namespace()
         args.checkpoint = None
-        if conf.get("hyperband_serch.keep_initialization"):
+        if conf.get("hyperband_search.keep_initialization"):
             args.checkpoint = f"{conf.folder}/checkpoint_00000.pt"
         if conf.get("hyperband_search.keep_pretrained"):
             args.checkpoint = f"{conf.folder}/checkpoint_best.pt"
