@@ -283,7 +283,7 @@ class HyperBandWorker(Worker):
             epochs += self.parent_job.config.get("hyperband_search.epoch_budget_tolerance")[int(sh_iter)]
             print("num epochs", epochs)
             if epochs < 1:
-                max_batches = len(self.parent_job.dataset.split("train"))/conf.get("train.batch_size") * epoch_budget
+                max_batches = len(self.parent_job.dataset.split("train"))/conf.get("train.batch_size") * epochs
                 if "distributed" in conf.get("model"):
                     max_batches /= conf.get("job.distributed.num_partitions")
                 max_batches = max(1, math.floor(max_batches))
