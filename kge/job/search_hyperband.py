@@ -412,7 +412,7 @@ class HyperBandWorker(Worker):
             conf.set("valid.every", epochs)
 
         # define distributed setup
-        distributed_workers_per_round = self.parent_job.config.get("hyperband_serach.distributed_worker_per_round")
+        distributed_workers_per_round = self.parent_job.config.get("hyperband_search.distributed_worker_per_round")
         if sh_iter in distributed_workers_per_round.keys():
             # change to distributed model if not yet defined
             if "distributed" not in conf.get("model"):
