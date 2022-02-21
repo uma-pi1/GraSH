@@ -775,6 +775,13 @@ hyperband_search:
   # Number of Hyperband iterations (if set to 1, the search equals successive halving)
   num_hpb_iter: 1
 
+  # define successive halving round number as key and num distributed worker as value
+  # for each device assigned to a trial define two workers
+  # if nothing is defined do not use distributed setup
+  # NOTE: distributed_model needs to be imported in base config
+  distributed_worker_per_round:
+    +++: +++
+
   # Search space definition passed to HPBandSter
   parameters: []
 

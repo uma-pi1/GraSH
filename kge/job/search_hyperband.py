@@ -390,7 +390,7 @@ class HyperBandWorker(Worker):
                     f"{hpb_iter}{str('{:02d}'.format(int(sh_iter) - 1))}{config_no}"
                 )
                 path_to_model = ""
-                if conf.get("hyperband_serch.keep_initialization"):
+                if conf.get("hyperband_search.keep_initialization"):
                     path_to_model = os.path.join(
                         f"{os.path.dirname(conf.folder)}",
                         f"{predecessor_trial_id}",
@@ -410,6 +410,30 @@ class HyperBandWorker(Worker):
         # set valid.every to train.max_epochs if its modulo != 0
         if epochs % self.parent_job.config.get("valid.every") != 0:
             conf.set("valid.every", epochs)
+
+        # define distributed setup
+        distributed_workers_per_round = self.parent_job.config.get("hyperband_serach.distributed_worker_per_round")
+        if sh_iter in distributed_workers_per_round.keys():
+            # change to distributed model if not yet defined
+            if "distributed" not in conf.get("model"):
+                conf.set("distributed_model.base_model.type", conf.get("model"))
+                conf.set("model", "distributed_model")
+            # set right number of workers and partitions
+            # for now we only assume random partitioning with shared ps
+            num_workers = distributed_workers_per_round[sh_iter]
+            conf.set("job.distributed.parameter_server", "shared")
+            conf.set("job.distributed.num_workers", num_workers)
+            conf.set("job.distributed.num_partitions", num_workers)
+
+            # we need to define the device pool
+            # just rotate the overall device pool so that it starts with given device
+            # but sort first so that we use up one device fully first
+            device_pool = np.array(self.parent_job.device_pool)
+            device_pool.sort()
+            device_position = np.argwhere(device_pool == conf.get("device"))[0][0]
+            device_pool = np.cat(device_pool[device_position:], device_position[:device_position])
+            device_pool = device_pool.to_list()
+            conf.set("job.device_pool", device_pool)
 
         # todo: compute total number of trials in init
         num_train_trials = "x"
