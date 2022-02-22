@@ -22,7 +22,7 @@ class KgeOptimizer:
                 **config.get("train.optimizer.default.args"),
             )
             return optimizer
-        if config.get("train.optimizer.default.type") in ["dist_adagrad", "dist_rowadagrad"]:
+        elif config.get("train.optimizer.default.type") in ["dist_adagrad", "dist_rowadagrad"]:
             from kge.distributed.misc import get_min_rank
             is_row = False
             use_lr_scheduler = False
@@ -50,7 +50,10 @@ class KgeOptimizer:
             return optimizer
         else:
             try:
-                optimizer = getattr(torch.optim, config.get("train.optimizer.default.type"))
+                if config.get("train.optimizer.default.type") == "RowAdagrad":
+                    optimizer = RowAdagrad
+                else:
+                    optimizer = getattr(torch.optim, config.get("train.optimizer.default.type"))
                 return optimizer(
                     KgeOptimizer._get_parameters_and_optimizer_args(config, model),
                     **config.get("train.optimizer.default.args"),
@@ -208,3 +211,87 @@ class KgeLRScheduler(Configurable):
             pass
         else:
             self._lr_scheduler.load_state_dict(state_dict)
+
+
+class RowAdagrad(torch.optim.Optimizer):
+    """
+    This is basically copy-pasted from PyTorch AdaGrad.
+    Same learning rate over complete embedding dimension as done in PyTorch BigGraph.
+    """
+
+    def __init__(self, params, lr=1e-2, lr_decay=0, weight_decay=0,
+                 initial_accumulator_value=0, eps=1e-10):
+        if not 0.0 <= lr:
+            raise ValueError("Invalid learning rate: {}".format(lr))
+        if not 0.0 <= lr_decay:
+            raise ValueError("Invalid lr_decay value: {}".format(lr_decay))
+        if not 0.0 <= weight_decay:
+            raise ValueError("Invalid weight_decay value: {}".format(weight_decay))
+        if not 0.0 <= initial_accumulator_value:
+            raise ValueError("Invalid initial_accumulator_value value: {}".format(
+                initial_accumulator_value))
+        if not 0.0 <= eps:
+            raise ValueError("Invalid epsilon value: {}".format(eps))
+
+        defaults = dict(lr=lr, lr_decay=lr_decay, eps=eps,
+                        weight_decay=weight_decay,
+                        initial_accumulator_value=initial_accumulator_value)
+        super().__init__(params, defaults)
+
+        for group in self.param_groups:
+            for p in group['params']:
+                state = self.state[p]
+                state['step'] = 0
+                state['sum'] = p.new_zeros((p.shape[0],))
+
+    def share_memory(self):
+        for group in self.param_groups:
+            for p in group['params']:
+                state = self.state[p]
+                state['sum'].share_memory_()
+
+    @torch.no_grad()
+    def step(self, closure=None):
+        """Performs a single optimization step.
+        Arguments:
+            closure (callable, optional): A closure that reevaluates the model
+                and returns the loss.
+        """
+        loss = None
+        if closure is not None:
+            with torch.enable_grad():
+                loss = closure()
+
+        for group in self.param_groups:
+            for p in group['params']:
+                if p.grad is None:
+                    continue
+
+                grad = p.grad
+                state = self.state[p]
+
+                state['step'] += 1
+
+                if group['weight_decay'] != 0:
+                    if p.grad.is_sparse:
+                        raise RuntimeError(
+                            "weight_decay option is not compatible with sparse gradients")
+                    grad = grad.add(p, alpha=group['weight_decay'])
+
+                clr = group['lr'] / (1 + (state['step'] - 1) * group['lr_decay'])
+
+                if grad.is_sparse:
+                    grad = grad.coalesce()  # the update is non-linear so indices must be unique
+                    grad_indices = grad._indices()[0]  # only need row indices
+                    grad_values = grad._values()
+                    size = grad.size()
+
+                    state['sum'].index_add_(0, grad_indices, grad_values.pow(2).mean(1))
+                    std_values = state['sum'][grad_indices].sqrt_().add_(group['eps']).unsqueeze(1)
+                    p.data.index_add_(0, grad_indices, -clr * grad_values / std_values)
+                else:
+                    state['sum'].add_((grad * grad).mean(1))
+                    std = state['sum'].sqrt().add_(group['eps'])
+                    p.addcdiv_(grad, std.unsqueeze(1), value=-clr)
+
+        return loss
