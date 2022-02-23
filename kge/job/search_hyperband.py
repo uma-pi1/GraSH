@@ -22,12 +22,15 @@ import shutil
 from collections import defaultdict
 import torch.multiprocessing as mp
 from multiprocessing import Manager
+import time
 
 
 class HyperBandPatch(HyperBand):
     def __init__(
         self,
         free_devices,
+        id_dict,
+        workers_per_round=None,
         configspace=None,
         eta=3,
         min_budget=0.01,
@@ -35,12 +38,27 @@ class HyperBandPatch(HyperBand):
         **kwargs,
     ):
         self.free_devices = free_devices
+        self.id_dict = id_dict
         self.assigned_devices = defaultdict(lambda: None)
+        if workers_per_round is None:
+            self.workers_per_round = defaultdict(lambda: 10000)
+        else:
+            self.workers_per_round = workers_per_round
+        # todo: add option to block search workers
         super(HyperBandPatch, self).__init__(
             configspace, eta, min_budget, max_budget, **kwargs
         )
 
     def _submit_job(self, config_id, config, budget):
+        hpb_iter = str("{:02d}".format(config_id[0]))
+        config_no = str("{:04d}".format(config_id[2]))
+        sh_iter = 0
+        if (hpb_iter, config_no) in self.id_dict:
+            sh_iter = self.id_dict[(hpb_iter, config_no)]
+        # todo: we should not do busy waiting here
+        # block search workers if workers are reduces for specific sh round
+        while self.num_running_jobs >= self.workers_per_round[sh_iter]:
+            time.sleep(1)
         with self.thread_cond:
             self.assigned_devices[config_id] = self.free_devices.pop()
             config["job.device"] = self.assigned_devices[config_id]
@@ -64,7 +82,8 @@ class HyperBandSearchJob(AutoSearchJob):
         self.name_server = None  # Server address to run the job on
         self.workers = []  # Workers that will run in parallel
         # create empty dict for id generation
-        self.id_dict = dict()
+        manager = Manager()
+        self.id_dict = manager.dict()
         self.processes = []
 
     def init_search(self):
@@ -138,8 +157,6 @@ class HyperBandSearchJob(AutoSearchJob):
         # Create workers (dummy logger to avoid output overhead from HPBandSter)
         worker_logger = logging.getLogger("dummy")
         worker_logger.setLevel(logging.DEBUG)
-        manager = Manager()
-        self.id_dict = manager.dict()
         for i in range(self.config.get("search.num_workers")):
             w = HyperBandWorker(
                 nameserver=self.config.get("hyperband_search.host"),
@@ -229,6 +246,12 @@ class HyperBandSearchJob(AutoSearchJob):
             directory=self.config.folder, overwrite=True
         )
 
+        # high number as upper limit is handled by hpb
+        workers_per_round = defaultdict(lambda: 10000)
+        workers_per_round.update(
+            self.config.get("hyperband_search.num_search_worker_per_round")
+        )
+
         # Configure the job
         hpb = HyperBandPatch(
             free_devices=self.free_devices,
@@ -246,6 +269,8 @@ class HyperBandSearchJob(AutoSearchJob):
                 self.config.get("hyperband_search.max_sh_rounds") - 1,
             ),
             max_budget=1,
+            id_dict=self.id_dict,
+            workers_per_round=workers_per_round,
         )
 
         # Run it
@@ -413,26 +438,36 @@ class HyperBandWorker(Worker):
 
         # define distributed setup
         distributed_workers_per_round = self.parent_job.config.get("hyperband_search.distributed_worker_per_round")
-        if sh_iter in distributed_workers_per_round.keys():
+        if str(int(sh_iter)) in distributed_workers_per_round.keys():
             # change to distributed model if not yet defined
             if "distributed" not in conf.get("model"):
                 conf.set("distributed_model.base_model.type", conf.get("model"))
                 conf.set("model", "distributed_model")
             # set right number of workers and partitions
             # for now we only assume random partitioning with shared ps
-            num_workers = distributed_workers_per_round[sh_iter]
+            num_workers = distributed_workers_per_round[str(int(sh_iter))]
             conf.set("job.distributed.parameter_server", "shared")
             conf.set("job.distributed.num_workers", num_workers)
             conf.set("job.distributed.num_partitions", num_workers)
+            # choose a distributed train job
+            conf.set("train.type", f"distributed_{conf.get('train.type')}")
+
+            current_optim = conf.get("train.optimizer.default.type")
+            if "dist" not in current_optim:
+                dist_optim_dict = {
+                    "Adagrad": "dist_adagrad",
+                    "RowAdagrad": "dist_rowadagrad",
+                }
+                conf.set("train.optimizer.default.type", dist_optim_dict[current_optim])
 
             # we need to define the device pool
             # just rotate the overall device pool so that it starts with given device
             # but sort first so that we use up one device fully first
             device_pool = np.array(self.parent_job.device_pool)
             device_pool.sort()
-            device_position = np.argwhere(device_pool == conf.get("device"))[0][0]
-            device_pool = np.cat(device_pool[device_position:], device_position[:device_position])
-            device_pool = device_pool.to_list()
+            device_position = np.argwhere(device_pool == conf.get("job.device"))[0][0]
+            device_pool = np.concatenate((device_pool[device_position:], device_pool[:device_position]))
+            device_pool = device_pool.tolist()
             conf.set("job.device_pool", device_pool)
 
         # todo: compute total number of trials in init

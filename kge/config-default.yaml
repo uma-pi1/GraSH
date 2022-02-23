@@ -782,6 +782,11 @@ hyperband_search:
   distributed_worker_per_round:
     +++: +++
 
+  # define successive halving round number as key and num distributed worker as value
+  # NOTE: round numbers need to be provided as string so yaml reads it correctly
+  num_search_worker_per_round:
+    +++: +++
+
   # Search space definition passed to HPBandSter
   parameters: []
 
