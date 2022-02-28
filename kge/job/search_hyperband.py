@@ -212,8 +212,14 @@ class HyperBandSearchJob(AutoSearchJob):
             "dataset.files.train.filename",
             os.path.join(path_to_subsets, f"train{subset_stats['name']}.del"),
         )
+        valid_split = config.get("valid.split")
         config.set(
-            "dataset.files.valid.filename",
+            f"dataset.files.{valid_split}.filename",
+            os.path.join(path_to_subsets, f"valid{subset_stats['name']}.del"),
+        )
+        # also set default valid set as it may be used for filtering
+        config.set(
+            f"dataset.files.valid.filename",
             os.path.join(path_to_subsets, f"valid{subset_stats['name']}.del"),
         )
         # only set test set for original dataset. Use the valid sets for all others.
