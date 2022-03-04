@@ -233,6 +233,8 @@ def _run_train_job(sicnk, device=None):
         # variable job not defined in distributed setting
         if "job" in locals():
             del job
+        if "cuda" in train_job_config.get("job.device"):
+            torch.cuda.empty_cache()
         gc.collect()
 
         return (train_job_index, best, best_metric)

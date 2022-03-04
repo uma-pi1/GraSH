@@ -1,6 +1,8 @@
 import concurrent.futures
 import logging
 import numpy as np
+import torch.cuda
+
 from kge.job import AutoSearchJob
 from kge import Config
 from kge import Dataset
@@ -23,6 +25,7 @@ from collections import defaultdict
 import torch.multiprocessing as mp
 from multiprocessing import Manager
 import time
+import gc
 
 
 class HyperBandPatch(HyperBand):
@@ -168,16 +171,13 @@ class HyperBandSearchJob(AutoSearchJob):
                 id_dict=self.id_dict,
                 id=i,
             )
-            if self.config.get("search.num_workers") == 1:
-                w.run(background=True)
-            else:
-                # todo: figure out why the process pool is not starting the jobs
-                print(f"starting process hpb-worker-process {i}")
-                p = mp.Process(target=w.run, args=(False,))
-                self.processes.append(p)
-                p.start()
-                # future = self.process_pool.submit(w.run, w, False)
-                # worker_futures.append(future)
+            # todo: figure out why the process pool is not starting the jobs
+            print(f"starting process hpb-worker-process {i}")
+            p = mp.Process(target=w.run, args=(False,))
+            self.processes.append(p)
+            p.start()
+            # future = self.process_pool.submit(w.run, w, False)
+            # worker_futures.append(future)
             self.workers.append(w)
 
     def modify_dataset_config(self, subset_index, config):
@@ -281,7 +281,7 @@ class HyperBandSearchJob(AutoSearchJob):
 
         # Run it
         print("run hpo search")
-        res = hpb.run(
+        hpb.run(
             n_iterations=self.config.get("hyperband_search.num_hpb_iter"),
             min_n_workers=self.config.get("search.num_workers"),
         )
@@ -556,7 +556,7 @@ class HyperBandWorker(Worker):
                 list(parameters.keys()),
             )
         )
-        self.parent_job.wait_task(concurrent.futures.ALL_COMPLETED)
+        # self.parent_job.wait_task(concurrent.futures.ALL_COMPLETED)
 
         # save package checkpoint
         args = Namespace()
@@ -570,7 +570,24 @@ class HyperBandWorker(Worker):
             package_model(args)
 
         best_score = best[1]["metric_value"]
-        return {"loss": 1 - best_score, "info": {}}
+        del best
+
+        def _kill_active_cuda_tensors():
+            """
+            Returns all tensors initialized on cuda devices
+            """
+            for obj in gc.get_objects():
+                try:
+                    if torch.is_tensor(obj) and obj.device.type == "cuda":
+                        #yield obj
+                        del obj
+                except:
+                    pass
+        _kill_active_cuda_tensors()
+        torch.cuda.empty_cache()
+        gc.collect()
+
+        return {"loss": 1 - best_score, "info": {"metric_value": best_score}}
 
     @staticmethod
     def get_configspace(config, seed):
