@@ -7,7 +7,6 @@ import torch
 from torch import multiprocessing as mp
 
 from kge.misc import set_seeds
-from kge.job import Job
 from .parameter_client import KgeParameterClient
 from .parameter_server import LapseParameterServer
 from .misc import get_min_rank, get_num_keys, get_optimizer_dim, set_master_environment
@@ -102,6 +101,8 @@ class WorkerProcess(mp.get_context("spawn").Process):
         self.result_pipe = result_pipe
 
     def run(self):
+        from kge.job import Job
+
         torch_device = self.config.get("job.device")
         if self.config.get("job.device") == "cuda":
             torch_device = "cuda:0"
