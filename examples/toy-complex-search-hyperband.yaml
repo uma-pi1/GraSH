@@ -11,7 +11,6 @@ hyperband_search:
   port: "None"
   seed: 1
   num_workers: 1
-  max_sh_rounds: 3
   max_epoch_budget: 16
   epoch_budget_tolerance: [0,0,0]
   eta: 4

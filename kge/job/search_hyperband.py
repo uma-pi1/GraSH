@@ -19,6 +19,7 @@ from hpbandster.optimizers import HyperBand
 from hpbandster.core.worker import Worker
 from argparse import Namespace
 import os
+import sys
 import yaml
 import shutil
 from collections import defaultdict
@@ -51,6 +52,7 @@ class HyperBandPatch(HyperBand):
         super(HyperBandPatch, self).__init__(
             configspace, eta, min_budget, max_budget, **kwargs
         )
+        print("max sh iter", self.max_SH_iter)
 
     def _submit_job(self, config_id, config, budget):
         hpb_iter = str("{:02d}".format(config_id[0]))
@@ -156,6 +158,13 @@ class HyperBandSearchJob(AutoSearchJob):
                 custom_dataset = Dataset.create(config_custom_data)
                 self.subsets.append(custom_dataset)
 
+        # todo: change so that we do not recompute it here but use the specifications
+        #  set in the hyperband master
+        min_budget = 1/self.config.get("hyperband_search.num_trials")
+        max_budget = 1
+        eta = self.config.get("hyperband_search.eta")
+        max_SH_rounds = -int(np.log(min_budget/max_budget)/np.log(eta)) + 1
+
         # worker_futures = []
         # Create workers (dummy logger to avoid output overhead from HPBandSter)
         worker_logger = logging.getLogger("dummy")
@@ -170,6 +179,7 @@ class HyperBandSearchJob(AutoSearchJob):
                 parent_job=self,
                 id_dict=self.id_dict,
                 id=i,
+                max_SH_rounds=max_SH_rounds,
             )
             # todo: figure out why the process pool is not starting the jobs
             print(f"starting process hpb-worker-process {i}")
@@ -269,11 +279,12 @@ class HyperBandSearchJob(AutoSearchJob):
             result_logger=result_logger,
             # previous_result=previous_run,
             eta=self.config.get("hyperband_search.eta"),
-            min_budget=1
-            / math.pow(
-                self.config.get("hyperband_search.eta"),
-                self.config.get("hyperband_search.max_sh_rounds") - 1,
-            ),
+            min_budget=1/self.config.get("hyperband_search.num_trials"),
+            #min_budget=1
+            #/ math.pow(
+            #    self.config.get("hyperband_search.eta"),
+            #    self.config.get("hyperband_search.max_sh_rounds") - 1,
+            #),
             max_budget=1,
             id_dict=self.id_dict,
             workers_per_round=workers_per_round,
@@ -302,11 +313,23 @@ class HyperBandWorker(Worker):
         self.job_config = kwargs.pop("job_config")
         self.parent_job = kwargs.pop("parent_job")
         self.id_dict = kwargs.pop("id_dict")
+        self.max_SH_rounds = kwargs.pop("max_SH_rounds")
         self.search_worker_id = kwargs.get("id")
         super().__init__(*args, **kwargs)
         self.next_trial_no = 0
+        self.search_budget = self.parent_job.config.get("hyperband_search.search_budget")
 
     def compute(self, config_id, config, budget, **kwargs):
+        try:
+            return self._compute(config_id, config, budget, **kwargs)
+        except Exception as e:
+            print("error:", e, file=sys.stderr)
+            if self.parent_job.config.get("search.on_error") == "arbort":
+                os._exit(1)
+            else:
+                raise e
+
+    def _compute(self, config_id, config, budget, **kwargs):
         """
         Creates a trial of the hyper-parameter optimization job and returns the best configuration of the trial.
         :param config_id: a triplet of ints that uniquely identifies a configuration. the convention is id =
@@ -337,23 +360,37 @@ class HyperBandWorker(Worker):
         conf.set("job.type", "train")
         conf.set_all(parameters)
 
+        # scale given budget based on the max budget in terms of train runs
+        # -1 since we need one complete run in the last round so distribute rest over
+        # other rounds
+        round_budget = (self.search_budget-1)/(self.max_SH_rounds-1)
+        print("budget", budget, "round budget", round_budget)
+        budget *= round_budget
+
+
         # determine the subset and epoch budget for this trial
         if self.parent_job.config.get("hyperband_search.variant") == "dataset":
             size_budget = budget
             epochs = self.parent_job.config.get("hyperband_search.max_epoch_budget")
         elif self.parent_job.config.get("hyperband_search.variant") == "both":
             size_budget = budget * math.pow(
-                2,
-                self.parent_job.config.get("hyperband_search.max_sh_rounds")
-                - int(sh_iter)
-                - 1,
+                2, self.max_SH_rounds - int(sh_iter) - 1
             )
+            # size_budget = budget * math.pow(
+            #     2,
+            #     self.parent_job.config.get("hyperband_search.max_sh_rounds")
+            #     - int(sh_iter)
+            #     - 1,
+            # )
             epoch_budget = budget * math.pow(
-                2,
-                self.parent_job.config.get("hyperband_search.max_sh_rounds")
-                - int(sh_iter)
-                - 1,
+                2, self.max_SH_rounds - int(sh_iter) - 1
             )
+            # epoch_budget = budget * math.pow(
+            #     2,
+            #     self.parent_job.config.get("hyperband_search.max_sh_rounds")
+            #     - int(sh_iter)
+            #     - 1,
+            # )
             epochs = math.floor(
                 self.parent_job.config.get("hyperband_search.max_epoch_budget")
                 * epoch_budget

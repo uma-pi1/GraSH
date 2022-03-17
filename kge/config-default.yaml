@@ -723,8 +723,11 @@ hyperband_search:
   # Random seed for generating the trial configs
   seed: 0
 
-  # Maximal number of successive halving rounds. Min budget is calculated from this value.
-  max_sh_rounds: 5
+  # Amount of trials to explore in the lowest fidelity round
+  num_trials: 64
+
+  # Maximal budget in terms of full train runs given for the complete search
+  search_budget: 4
 
   # Epoch bdget tolerance is added to the respective round's epoch budget. Index 0 refers
   # to the first and last index to the last SH round.
