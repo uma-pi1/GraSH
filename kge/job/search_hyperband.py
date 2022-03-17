@@ -620,8 +620,10 @@ class HyperBandWorker(Worker):
                         del obj
                 except:
                     pass
+        gc.collect()
         _kill_active_cuda_tensors()
-        torch.cuda.empty_cache()
+        with torch.cuda.device(conf.get("job.device")):
+            torch.cuda.empty_cache()
         gc.collect()
 
         return {"loss": 1 - best_score, "info": {"metric_value": best_score}}
