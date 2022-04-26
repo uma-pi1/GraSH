@@ -27,6 +27,11 @@ job:
   # the corresponding configuration keys for mode information.
   type: train
 
+  # When set, LibKGE automatically corrects certain invalid configuration
+  # options. Each such change is logged. When not set and the configuration is
+  # invalid, LibKGE raises an error.
+  auto_correct: False
+
   # Main device to use for this job (e.g., 'cpu', 'cuda', 'cuda:0')
   device: 'cuda'
   device_pool: [ ]
@@ -337,11 +342,6 @@ train:
     # Whether to always keep checkpoint containing initialized model
     # ('checkpoint_00000.pt') for reproducibility.
     keep_init: True
-
-  # When set, LibKGE automatically corrects certain invalid configuration
-  # options. Each such change is logged. When not set and the configuration is
-  # invalid, LibKGE raises an error.
-  auto_correct: False
 
   # Abort training (with an error) when the value of the cost function becomes
   # not a number.
@@ -731,10 +731,10 @@ hyperband_search:
 
   # Epoch bdget tolerance is added to the respective round's epoch budget. Index 0 refers
   # to the first and last index to the last SH round.
-  epoch_budget_tolerance: [0,0,0,0,0]
+  # epoch_budget_tolerance: [0,0,0,0,0]
 
   # Maximum epochs for training. Will be scaled down based on the SH budget in each round.
-  max_epoch_budget: 400
+  # max_epoch_budget: 400
 
   # Eta for size and epoch budget. Budget will be shared equally between size and epochs.
   eta: 4
@@ -761,10 +761,10 @@ hyperband_search:
   min_negatives_percentage: 0.01
 
   # Possible options are:
-  # - 'both': dynamically change epochs and dataset size (50-50)
-  # - 'epochs': only change epochs and use full dataset
-  # - 'dataset': only change dataset sizes and use static number of epochs
-  variant: 'dataset'
+  # - 'combined': dynamically change epochs and graph size (50-50)
+  # - 'epoch': only change epochs and use full graph
+  # - 'graph': only change graph sizes and use static number of epochs
+  variant: 'graph'
 
   # Information about the available subsets. This should include:
   # - name: name of suffix which is used in the subset filenames (use '' for full data)

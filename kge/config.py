@@ -783,6 +783,14 @@ def _process_deprecated_options(options: Dict[str, Any]):
                     renamed_keys.add(key)
         return renamed_keys
 
+    # 21.04.22
+    delete_key_with_value("hyperband_search.epoch_budget_tolerance", [0, 0, 0, 0, 0])
+    delete_key_with_value("hyperband_search.max_epoch_budget", 400)
+    rename_value("hyperband_search.variant", "dataset", "graph")
+    rename_value("hyperband_search.variant", "epochs", "epoch")
+    rename_value("hyperband_search.variant", "both", "combined")
+    rename_key("train.auto_correct", "job.auto_correct")
+
     # 17.03.22
     delete_key_with_value("hyperband_search.max_sh_rounds", 4)
 

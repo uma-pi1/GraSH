@@ -27,6 +27,7 @@ import torch.multiprocessing as mp
 from multiprocessing import Manager
 import time
 import gc
+from kge.util import Subgraph
 
 
 class HyperBandPatch(HyperBand):
@@ -52,7 +53,6 @@ class HyperBandPatch(HyperBand):
         super(HyperBandPatch, self).__init__(
             configspace, eta, min_budget, max_budget, **kwargs
         )
-        print("max sh iter", self.max_SH_iter)
 
     def _submit_job(self, config_id, config, budget):
         hpb_iter = str("{:02d}".format(config_id[0]))
@@ -90,6 +90,9 @@ class HyperBandSearchJob(AutoSearchJob):
         manager = Manager()
         self.id_dict = manager.dict()
         self.processes = []
+        self.sh_rounds = 0
+        self.subset_stats = dict()
+        self.subsets = dict()
 
     def init_search(self):
         # Assigning the port
@@ -108,62 +111,31 @@ class HyperBandSearchJob(AutoSearchJob):
         # Start the server
         self.name_server.start()
 
-        if self.config.get("hyperband_search.variant") != "epochs":
+        if self.config.get("hyperband_search.variant") != "epoch":
+            # todo: replace by information from yaml-file in future and only load relevant subsets
+
+            # add full dataset to subset dict and get k_core_stats
+            self.subsets[0] = self.dataset
+            subgraph = Subgraph(self.dataset)
+            self.subset_stats = subgraph.get_k_core_stats()
+
             # compute relative sizes and costs for the available subsets
             cost_metric = self.config.get("hyperband_search.cost_metric")
-            self.subset_stats = self.config.get("hyperband_search.subsets")
+            # self.subset_stats = self.config.get("hyperband_search.subsets")
             for i in range(len(self.subset_stats)):
-                self.subset_stats[i]["relative_entities"] = (
-                    self.subset_stats[i]["num_entities"]
-                    / self.subset_stats[0]["num_entities"]
-                )
-                self.subset_stats[i]["relative_train"] = (
-                    self.subset_stats[i]["num_train_triples"]
-                    / self.subset_stats[0]["num_train_triples"]
-                )
-                # use custom power estimate if available, else compute it
-                if (
-                    cost_metric == "power_usage"
-                    and "estimated_power_usage" not in self.subset_stats[i]
-                ):
-                    raise ValueError(
-                        "Estimated power usage not provided. Selection by power usage not possible."
-                    )
-                if "estimated_power_usage" in self.subset_stats[i] and cost_metric in [
-                    "auto",
-                    "power_usage",
-                ]:
-                    self.subset_stats[i]["relative_costs"] = self.subset_stats[i][
-                        "estimated_power_usage"
-                    ]
-                elif cost_metric in ["auto", "triples_and_entities"]:
-                    self.subset_stats[i]["relative_costs"] = (
-                        self.subset_stats[i]["relative_entities"]
-                        * self.subset_stats[i]["relative_train"]
+                if cost_metric in ["auto", "triples_and_entities"]:
+                    self.subset_stats[i]["rel_costs"] = (
+                        self.subset_stats[i]["rel_entities"]
+                        * self.subset_stats[i]["rel_triples"]
                     )
                 elif cost_metric == "triples":
-                    self.subset_stats[i]["relative_costs"] = self.subset_stats[i][
-                        "relative_train"
+                    self.subset_stats[i]["rel_costs"] = self.subset_stats[i][
+                        "rel_triples"
                     ]
                 else:
                     raise ValueError(
                         f"Hyperband cost metric {cost_metric} is not supported."
                     )
-
-            # load subgraph datasets
-            self.subsets = list()
-            for i in range(len(self.subset_stats)):
-                config_custom_data = copy.deepcopy(self.config)
-                config_custom_data = self.modify_dataset_config(i, config_custom_data)
-                custom_dataset = Dataset.create(config_custom_data)
-                self.subsets.append(custom_dataset)
-
-        # todo: change so that we do not recompute it here but use the specifications
-        #  set in the hyperband master
-        min_budget = 1/self.config.get("hyperband_search.num_trials")
-        max_budget = 1
-        eta = self.config.get("hyperband_search.eta")
-        max_SH_rounds = -int(np.log(min_budget/max_budget)/np.log(eta)) + 1
 
         # worker_futures = []
         # Create workers (dummy logger to avoid output overhead from HPBandSter)
@@ -179,13 +151,15 @@ class HyperBandSearchJob(AutoSearchJob):
                 parent_job=self,
                 id_dict=self.id_dict,
                 id=i,
-                max_SH_rounds=max_SH_rounds,
             )
             # todo: figure out why the process pool is not starting the jobs
             print(f"starting process hpb-worker-process {i}")
-            p = mp.Process(target=w.run, args=(False,))
-            self.processes.append(p)
-            p.start()
+            w.run(background=True)
+
+            #p = mp.Process(target=w.run, args=(False,))
+            #self.processes.append(p)
+            #p.start()
+
             # future = self.process_pool.submit(w.run, w, False)
             # worker_futures.append(future)
             self.workers.append(w)
@@ -196,46 +170,46 @@ class HyperBandSearchJob(AutoSearchJob):
         :return: modified config
         """
         subset_stats = self.subset_stats[subset_index]
-        if subset_stats["name"] == "":
+        if subset_stats['filename_suffix'] == "":
             config.set("dataset.files.test.filename", "test.del")
             return config
         path_to_subsets = os.path.join("subsets", "k-core")
-        config.set("dataset.num_entities", subset_stats["num_entities"])
-        config.set("dataset.num_relations", subset_stats["num_relations"])
+        config.set("dataset.num_entities", subset_stats["entities"])
+        config.set("dataset.num_relations", subset_stats["relations"])
         config.set(
             "dataset.files.entity_ids.filename",
-            os.path.join(path_to_subsets, f"entity_ids{subset_stats['name']}.del"),
+            os.path.join(path_to_subsets, f"entity_ids{subset_stats['filename_suffix']}.del"),
         )
         config.set(
             "dataset.files.entity_strings.filename",
-            os.path.join(path_to_subsets, f"entity_ids{subset_stats['name']}.del"),
+            os.path.join(path_to_subsets, f"entity_ids{subset_stats['filename_suffix']}.del"),
         )
         config.set(
             "dataset.files.relation_ids.filename",
-            os.path.join(path_to_subsets, f"relation_ids{subset_stats['name']}.del"),
+            os.path.join(path_to_subsets, f"relation_ids{subset_stats['filename_suffix']}.del"),
         )
         config.set(
             "dataset.files.relation_strings.filename",
-            os.path.join(path_to_subsets, f"relation_ids{subset_stats['name']}.del"),
+            os.path.join(path_to_subsets, f"relation_ids{subset_stats['filename_suffix']}.del"),
         )
         config.set(
             "dataset.files.train.filename",
-            os.path.join(path_to_subsets, f"train{subset_stats['name']}.del"),
+            os.path.join(path_to_subsets, f"train{subset_stats['filename_suffix']}.del"),
         )
         valid_split = config.get("valid.split")
         config.set(
             f"dataset.files.{valid_split}.filename",
-            os.path.join(path_to_subsets, f"valid{subset_stats['name']}.del"),
+            os.path.join(path_to_subsets, f"valid{subset_stats['filename_suffix']}.del"),
         )
         # also set default valid set as it may be used for filtering
         config.set(
             f"dataset.files.valid.filename",
-            os.path.join(path_to_subsets, f"valid{subset_stats['name']}.del"),
+            os.path.join(path_to_subsets, f"valid{subset_stats['filename_suffix']}.del"),
         )
         # only set test set for original dataset. Use the valid sets for all others.
         config.set(
             "dataset.files.test.filename",
-            os.path.join(path_to_subsets, f"valid{subset_stats['name']}.del"),
+            os.path.join(path_to_subsets, f"valid{subset_stats['filename_suffix']}.del"),
         )
         return config
 
@@ -268,6 +242,27 @@ class HyperBandSearchJob(AutoSearchJob):
             self.config.get("hyperband_search.num_search_worker_per_round")
         )
 
+        # Determine Hyperband configuration
+        num_trials = self.config.get("hyperband_search.num_trials")
+        eta = self.config.get("hyperband_search.eta")
+        sh_rounds = math.log(num_trials, eta)
+        if not sh_rounds.is_integer():
+            if self.config.get("job.auto_correct"):
+                sh_rounds = math.floor(sh_rounds)
+                num_trials = eta ** sh_rounds
+                self.config.log(
+                    "Setting hyperband.num_trials to {}, was set to {} and needs to "
+                    "equal a positive integer power of eta.".format(num_trials,
+                                                                    self.config.get("hyperband_search.num_trials"))
+                )
+                # todo: update config file?
+            else:
+                raise Exception(
+                    "hyperband.num_trials was set to {}, "
+                    "needs to equal a positive integer power of eta.".format(num_trials)
+                )
+        self.sh_rounds = int(sh_rounds)
+
         # Configure the job
         hpb = HyperBandPatch(
             free_devices=self.free_devices,
@@ -278,13 +273,8 @@ class HyperBandSearchJob(AutoSearchJob):
             nameserver=self.config.get("hyperband_search.host"),
             result_logger=result_logger,
             # previous_result=previous_run,
-            eta=self.config.get("hyperband_search.eta"),
-            min_budget=1/self.config.get("hyperband_search.num_trials"),
-            #min_budget=1
-            #/ math.pow(
-            #    self.config.get("hyperband_search.eta"),
-            #    self.config.get("hyperband_search.max_sh_rounds") - 1,
-            #),
+            eta=eta,
+            min_budget=1/num_trials,
             max_budget=1,
             id_dict=self.id_dict,
             workers_per_round=workers_per_round,
@@ -313,7 +303,6 @@ class HyperBandWorker(Worker):
         self.job_config = kwargs.pop("job_config")
         self.parent_job = kwargs.pop("parent_job")
         self.id_dict = kwargs.pop("id_dict")
-        self.max_SH_rounds = kwargs.pop("max_SH_rounds")
         self.search_worker_id = kwargs.get("id")
         super().__init__(*args, **kwargs)
         self.next_trial_no = 0
@@ -324,7 +313,7 @@ class HyperBandWorker(Worker):
             return self._compute(config_id, config, budget, **kwargs)
         except Exception as e:
             print("error:", e, file=sys.stderr)
-            if self.parent_job.config.get("search.on_error") == "arbort":
+            if self.parent_job.config.get("search.on_error") == "abort":
                 os._exit(1)
             else:
                 raise e
@@ -341,19 +330,19 @@ class HyperBandWorker(Worker):
         """
         parameters = _process_deprecated_options(copy.deepcopy(config))
 
-        # use first and thrid value of config_id to create the basis of the foldername
-        hpb_iter = str("{:02d}".format(config_id[0]))
-        config_no = str("{:04d}".format(config_id[2]))
+        # use first and third value of config_id to create the basis of the foldername
+        hpb_iter = config_id[0]
+        config_no = config_id[2]
 
         if (hpb_iter, config_no) in self.parent_job.id_dict:
             self.id_dict[(hpb_iter, config_no)] += 1
         else:
             self.id_dict[(hpb_iter, config_no)] = 0
 
-        sh_iter = str("{:02d}".format(self.id_dict[(hpb_iter, config_no)]))
+        sh_iter = self.id_dict[(hpb_iter, config_no)]
 
         # compute new result
-        trial_no = f"{hpb_iter}{sh_iter}{config_no}"
+        trial_no = str("{:02d}".format(hpb_iter)) + str("{:02d}".format(sh_iter)) + str("{:04d}".format(config_no))
 
         # create job for trial
         conf = self.job_config.clone(trial_no)
@@ -363,50 +352,25 @@ class HyperBandWorker(Worker):
         # scale given budget based on the max budget in terms of train runs
         # -1 since we need one complete run in the last round so distribute rest over
         # other rounds
-        round_budget = (self.search_budget-1)/(self.max_SH_rounds-1)
-        print("budget", budget, "round budget", round_budget)
-        budget *= round_budget
+        if sh_iter < self.parent_job.sh_rounds:
+            budget = budget * (self.parent_job.config.get(
+                "hyperband_search.search_budget") / self.parent_job.sh_rounds)
 
-
-        # determine the subset and epoch budget for this trial
-        if self.parent_job.config.get("hyperband_search.variant") == "dataset":
-            size_budget = budget
-            epochs = self.parent_job.config.get("hyperband_search.max_epoch_budget")
-        elif self.parent_job.config.get("hyperband_search.variant") == "both":
-            size_budget = budget * math.pow(
-                2, self.max_SH_rounds - int(sh_iter) - 1
-            )
-            # size_budget = budget * math.pow(
-            #     2,
-            #     self.parent_job.config.get("hyperband_search.max_sh_rounds")
-            #     - int(sh_iter)
-            #     - 1,
-            # )
-            epoch_budget = budget * math.pow(
-                2, self.max_SH_rounds - int(sh_iter) - 1
-            )
-            # epoch_budget = budget * math.pow(
-            #     2,
-            #     self.parent_job.config.get("hyperband_search.max_sh_rounds")
-            #     - int(sh_iter)
-            #     - 1,
-            # )
+        # determine the epochs for this trial
+        if self.parent_job.config.get("hyperband_search.variant") == "graph":
+            epochs = self.parent_job.config.get("train.max_epochs")
+        elif self.parent_job.config.get("hyperband_search.variant") == "combined":
+            # share savings equally between graph and epochs by taking the square root
+            budget = math.sqrt(budget)
             epochs = math.floor(
-                self.parent_job.config.get("hyperband_search.max_epoch_budget")
-                * epoch_budget
+                self.parent_job.config.get("train.max_epochs")
+                * budget
             )
-            epochs += self.parent_job.config.get(
-                "hyperband_search.epoch_budget_tolerance"
-            )[int(sh_iter)]
-        elif self.parent_job.config.get("hyperband_search.variant") == "epochs":
-            epoch_budget = budget
+        elif self.parent_job.config.get("hyperband_search.variant") == "epoch":
             epochs = (
-                self.parent_job.config.get("hyperband_search.max_epoch_budget")
-                * epoch_budget
+                self.parent_job.config.get("train.max_epochs")
+                * budget
             )
-            epochs += self.parent_job.config.get(
-                "hyperband_search.epoch_budget_tolerance"
-            )[int(sh_iter)]
             print("num epochs", epochs)
             if epochs < 1:
                 max_batches = (
@@ -422,24 +386,33 @@ class HyperBandWorker(Worker):
             epochs = math.floor(epochs)
             print("num epochs", epochs)
 
-        if self.parent_job.config.get("hyperband_search.variant") != "epochs":
+        # determine the subset for this trial
+        if self.parent_job.config.get("hyperband_search.variant") != "epoch":
             # determine and set the dataset to use based on the budget
             subset_index = -1
             for i in range(len(self.parent_job.subset_stats)):
-                if self.parent_job.subset_stats[i]["relative_costs"] <= size_budget:
+                if self.parent_job.subset_stats[i]["rel_costs"] <= budget:
                     subset_index = i
                     break
             if subset_index == -1:
                 raise ValueError(
-                    f"no fitting subgraph for size_budget {size_budget} found"
+                    f"no fitting subgraph for size_budget {budget} found"
                 )
+
+            # check if dataset was already loaded and do so if not
+            if subset_index not in self.parent_job.subsets:
+                config_custom_data = copy.deepcopy(self.parent_job.config)
+                config_custom_data = self.parent_job.modify_dataset_config(subset_index, config_custom_data)
+                custom_dataset = Dataset.create(config_custom_data)
+                self.parent_job.subsets[subset_index] = custom_dataset
+
             self.parent_job.dataset = self.parent_job.subsets[subset_index]
             conf = self.parent_job.modify_dataset_config(subset_index, conf)
 
             # downscale number of negatives
             number_samples_s = parameters.get("negative_sampling.num_samples.s")
             negatives_scaler = max(
-                self.parent_job.subset_stats[subset_index]["relative_entities"],
+                self.parent_job.subset_stats[subset_index]["rel_entities"],
                 self.parent_job.config.get("hyperband_search.min_negatives_percentage"),
             )
             conf.set(
@@ -453,10 +426,9 @@ class HyperBandWorker(Worker):
             )
 
             # reuse the predecessor model checkpoint if available to keep initialization
-            if sh_iter != "00":
-                predecessor_trial_id = (
-                    f"{hpb_iter}{str('{:02d}'.format(int(sh_iter) - 1))}{config_no}"
-                )
+            if sh_iter != 0:
+                predecessor_trial_id = str("{:02d}".format(hpb_iter)) + str("{:02d}".format(sh_iter - 1)) + str(
+                    "{:04d}".format(config_no))
                 path_to_model = ""
                 if conf.get("hyperband_search.keep_initialization"):
                     path_to_model = os.path.join(
@@ -481,14 +453,14 @@ class HyperBandWorker(Worker):
 
         # define distributed setup
         distributed_workers_per_round = self.parent_job.config.get("hyperband_search.distributed_worker_per_round")
-        if str(int(sh_iter)) in distributed_workers_per_round.keys():
+        if str(sh_iter) in distributed_workers_per_round.keys():
             # change to distributed model if not yet defined
             if "distributed" not in conf.get("model"):
                 conf.set("distributed_model.base_model.type", conf.get("model"))
                 conf.set("model", "distributed_model")
             # set right number of workers and partitions
             # for now we only assume random partitioning with shared ps
-            num_workers = distributed_workers_per_round[str(int(sh_iter))]
+            num_workers = distributed_workers_per_round[str(sh_iter)]
             conf.set("job.distributed.parameter_server", "shared")
             conf.set("job.distributed.num_workers", num_workers)
             conf.set("job.distributed.num_partitions", num_workers)
@@ -554,13 +526,12 @@ class HyperBandWorker(Worker):
 
         # copy last checkpoint from previous sh round to new folder for epoch only variant
         if (
-            self.parent_job.config.get("hyperband_search.variant") == "epochs"
-            and sh_iter != "00"
+            self.parent_job.config.get("hyperband_search.variant") == "epoch"
+            and sh_iter != 0
         ):
             copied = False
-            predecessor_trial_id = (
-                f"{hpb_iter}{str('{:02d}'.format(int(sh_iter) - 1))}{config_no}"
-            )
+            predecessor_trial_id = str("{:02d}".format(hpb_iter)) + str("{:02d}".format(sh_iter - 1)) + str(
+                "{:04d}".format(config_no))
             for filename in os.listdir(
                 f"{os.path.dirname(conf.folder)}/{predecessor_trial_id}/"
             ):
