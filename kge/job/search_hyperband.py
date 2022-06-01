@@ -28,13 +28,16 @@ from multiprocessing import Manager
 import time
 import gc
 from kge.util import Subgraph
+from kge.util import load_checkpoint
 
 
 class HyperBandPatch(HyperBand):
     def __init__(
         self,
         free_devices,
+        trial_dict,
         id_dict,
+        result_dict,
         workers_per_round=None,
         configspace=None,
         eta=3,
@@ -43,7 +46,9 @@ class HyperBandPatch(HyperBand):
         **kwargs,
     ):
         self.free_devices = free_devices
+        self.trial_dict = trial_dict
         self.id_dict = id_dict
+        self.result_dict = result_dict
         self.assigned_devices = defaultdict(lambda: None)
         if workers_per_round is None:
             self.workers_per_round = defaultdict(lambda: 10000)
@@ -88,7 +93,9 @@ class HyperBandSearchJob(AutoSearchJob):
         self.workers = []  # Workers that will run in parallel
         # create empty dict for id generation
         manager = Manager()
+        self.trial_dict = manager.dict()
         self.id_dict = manager.dict()
+        self.result_dict = manager.dict()
         self.processes = []
         self.sh_rounds = 0
         self.subset_stats = dict()
@@ -111,6 +118,11 @@ class HyperBandSearchJob(AutoSearchJob):
         # Start the server
         self.name_server.start()
 
+        # Load prior results if available
+        if self.results:
+            for k, v in self.results[0].items():
+                self.trial_dict[k] = v
+
         if self.config.get("hyperband_search.variant") != "epoch":
             # todo: replace by information from yaml-file in future and only load relevant subsets
 
@@ -123,6 +135,7 @@ class HyperBandSearchJob(AutoSearchJob):
             cost_metric = self.config.get("hyperband_search.cost_metric")
             # self.subset_stats = self.config.get("hyperband_search.subsets")
             for i in range(len(self.subset_stats)):
+                # todo: auto weg
                 if cost_metric in ["auto", "triples_and_entities"]:
                     self.subset_stats[i]["rel_costs"] = (
                         self.subset_stats[i]["rel_entities"]
@@ -149,16 +162,19 @@ class HyperBandSearchJob(AutoSearchJob):
                 run_id=self.config.get("hyperband_search.run_id"),
                 job_config=self.config,
                 parent_job=self,
+                trial_dict=self.trial_dict,
                 id_dict=self.id_dict,
+                result_dict=self.result_dict,
                 id=i,
             )
             # todo: figure out why the process pool is not starting the jobs
             print(f"starting process hpb-worker-process {i}")
-            w.run(background=True)
 
-            #p = mp.Process(target=w.run, args=(False,))
-            #self.processes.append(p)
-            #p.start()
+            # fniesel windows change
+            w.run(background=True)
+            # p = mp.Process(target=w.run, args=(False,))
+            # self.processes.append(p)
+            # p.start()
 
             # future = self.process_pool.submit(w.run, w, False)
             # worker_futures.append(future)
@@ -276,7 +292,9 @@ class HyperBandSearchJob(AutoSearchJob):
             eta=eta,
             min_budget=1/num_trials,
             max_budget=1,
+            trial_dict=self.trial_dict,
             id_dict=self.id_dict,
+            result_dict=self.result_dict,
             workers_per_round=workers_per_round,
         )
 
@@ -302,7 +320,9 @@ class HyperBandWorker(Worker):
     def __init__(self, *args, **kwargs):
         self.job_config = kwargs.pop("job_config")
         self.parent_job = kwargs.pop("parent_job")
+        self.trial_dict = kwargs.pop("trial_dict")
         self.id_dict = kwargs.pop("id_dict")
+        self.result_dict = kwargs.pop("result_dict")
         self.search_worker_id = kwargs.get("id")
         super().__init__(*args, **kwargs)
         self.next_trial_no = 0
@@ -341,13 +361,27 @@ class HyperBandWorker(Worker):
 
         sh_iter = self.id_dict[(hpb_iter, config_no)]
 
-        # compute new result
+        # put together the trial number
         trial_no = str("{:02d}".format(hpb_iter)) + str("{:02d}".format(sh_iter)) + str("{:04d}".format(config_no))
 
         # create job for trial
         conf = self.job_config.clone(trial_no)
         conf.set("job.type", "train")
         conf.set_all(parameters)
+
+        # check if trial result is already available for the given parameters
+        if trial_no in self.trial_dict:
+            # and parameters == self.trial_dict[trial_no][1]:
+            set_new = set(parameters.items())
+            set_old = set(self.trial_dict[trial_no][1].items())
+            difference = set_old - set_new
+            if not difference:
+                valid_metric = conf.get('valid.metric')
+                best_score = self.trial_dict[trial_no][0]
+                conf.log(f"Trial {conf.folder} registered with {valid_metric} {best_score}")
+                return {"loss": 1 - best_score, "info": {}}
+        #  else:
+            # todo: delete checkpoint if parameters have changed
 
         # scale given budget based on the max budget in terms of train runs
         # -1 since we need one complete run in the last round so distribute rest over
@@ -498,6 +532,7 @@ class HyperBandWorker(Worker):
         # of checkpoint
         # last_checkpoint_number = conf.last_checkpoint_number()
         # if last_checkpoint_number is not None and last_checkpoint_number >= conf.get("train.max_epochs"):
+        """
         valid_metric = conf.get("valid.metric")
 
         def get_best_score(trace_path):
@@ -508,11 +543,14 @@ class HyperBandWorker(Worker):
                 return best_score, max_epoch
             with open(trace_path) as trace:
                 for line in trace.readlines():
-                    if valid_metric not in line:
+                    if valid_metric in line:
+                        line = yaml.load(line, Loader=yaml.SafeLoader)
+                        best_score = max(best_score, line[valid_metric])
+                    elif 'train_completed' in line:
+                        max_epoch = 1
+                    else:
                         continue
-                    line = yaml.load(line, Loader=yaml.SafeLoader)
-                    best_score = max(best_score, line[valid_metric])
-                    max_epoch = line["epoch"]
+
             return best_score, max_epoch
 
         if "distributed" in conf.get("model"):
@@ -520,9 +558,10 @@ class HyperBandWorker(Worker):
         else:
             trace_path = os.path.join(conf.folder, "trace.yaml")
         best_score, max_epoch = get_best_score(trace_path)
-        if best_score >= 0 and max_epoch >= conf.get("train.max_epochs"):
+        if best_score >= 0 and max_epoch == 1: #>= conf.get("train.max_epochs"):
             conf.log(f"Trial {conf.folder} registered with {valid_metric} {best_score}")
             return {"loss": 1 - best_score, "info": {}}
+        """
 
         # copy last checkpoint from previous sh round to new folder for epoch only variant
         if (
@@ -596,6 +635,24 @@ class HyperBandWorker(Worker):
         with torch.cuda.device(conf.get("job.device")):
             torch.cuda.empty_cache()
         gc.collect()
+
+        # remove parameters that can be ignored when resuming
+        parameters.pop('job.device', None)
+        # add score and parameters to trial dict
+        self.trial_dict[trial_no] = [best_score, parameters]
+
+        # save search checkpoint - todo: move to parent job
+        filename = f"{os.path.dirname(conf.folder)}//checkpoint_00001.pt"
+        self.parent_job.config.log("Saving checkpoint to {}...".format(filename))
+        torch.save(
+            {
+                "type": "search_hyperband",
+                "parameters": [],
+                "results": [self.trial_dict._getvalue()],
+                "job_id": self.parent_job.job_id,
+            },
+            filename,
+        )
 
         return {"loss": 1 - best_score, "info": {"metric_value": best_score}}
 

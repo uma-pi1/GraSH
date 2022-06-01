@@ -25,6 +25,8 @@ class Subgraph:
         self._subsets = dict()
         self._subset_stats = dict()
 
+        """
+
         # prepare relevant knowledge graph files for subset creation
         self._train = self._dataset._triples["train"]
         self._train_df = pd.DataFrame(self._train, columns=self.TRIPLE_COLUMNS).astype("int")
@@ -34,6 +36,8 @@ class Subgraph:
         self._entities_df.index.name = "id"
         self._relations_df = pd.DataFrame(self._dataset._meta["relation_ids"], columns=self.TUPLE_COLUMN)
         self._relations_df.index.name = "id"
+
+        """
 
     def get_k_core_stats(self):
         """
