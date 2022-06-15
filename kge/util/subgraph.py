@@ -1,5 +1,8 @@
 import os
 import pandas as pd
+import numba
+import torch
+import numpy as np
 import igraph as ig
 from sklearn.model_selection import train_test_split
 from kge import Dataset
@@ -25,19 +28,12 @@ class Subgraph:
         self._subsets = dict()
         self._subset_stats = dict()
 
-        """
-
-        # prepare relevant knowledge graph files for subset creation
         self._train = self._dataset._triples["train"]
-        self._train_df = pd.DataFrame(self._train, columns=self.TRIPLE_COLUMNS).astype("int")
         self._valid = self._dataset._triples["valid"]
-        self._valid_df = pd.DataFrame(self._valid, columns=self.TRIPLE_COLUMNS).astype("int")
-        self._entities_df = pd.DataFrame(self._dataset._meta["entity_ids"], columns=self.TUPLE_COLUMN)
-        self._entities_df.index.name = "id"
-        self._relations_df = pd.DataFrame(self._dataset._meta["relation_ids"], columns=self.TUPLE_COLUMN)
-        self._relations_df.index.name = "id"
-
-        """
+        self._entities = np.array(self._dataset._meta["entity_ids"])
+        self._entity_ids = np.arange(len(self._entities))
+        self._relations = np.array(self._dataset._meta["relation_ids"])
+        self._relation_ids = np.arange(len(self._relations))
 
     def get_k_core_stats(self):
         """
@@ -52,26 +48,31 @@ class Subgraph:
             with open(f"{self._dataset.folder}/subsets/subset_stats.yaml", "r") as stream:
                 self._subset_stats = yaml.safe_load(stream)
         except IOError:
+
+            train_np = self._train.cpu().detach().numpy()
+
             # perform k-core decomposition
-            vertices = self._train[:, (0, 2)].unique(sorted=True)
-            edges = self._train[:, (0, 2)]
+            vertices = np.unique(train_np[:, (0, 2)])
+            edges = train_np[:, (0, 2)]
 
             # create igraph
             graph = ig.Graph()
-            graph.add_vertices(vertices.tolist())
-            graph.add_edges(edges.tolist())
+            graph.add_vertices(vertices)
+            graph.add_edges(edges)
             graph.simplify(multiple=True, loops=True)
 
             # compute core values
             core_numbers = graph.coreness()
 
             # add whole graph stats
-            self._subset_stats[0] = {"entities": len(self._entities_df), "relations": len(self._relations_df),
-                                     "train": len(self._train_df), "valid": len(self._valid_df), "rel_triples": 1.0,
+            self._subset_stats[0] = {"entities": len(self._entities), "relations": len(self._relations),
+                                     "train": len(self._train), "valid": len(self._valid), "rel_triples": 1.0,
                                      "rel_entities": 1.0, "filename_suffix": ""}
 
             # compute k-cores
             k = 1
+            previous_subset = train_np
+            # todo: further optimization by filtering previous k-core subset instead of whole train
             while True:
                 core_indices = [v_idx for v_idx in range(len(vertices)) if core_numbers[v_idx] >= k]
                 k_core_graph = graph.subgraph(core_indices)
@@ -79,9 +80,14 @@ class Subgraph:
                     # exit loop if max k was reached
                     break
                 else:
-                    # select all triples that are contained in k-core and save file
+                    # select all triples that are contained in k-core
                     v_selected = k_core_graph.get_vertex_dataframe().name.values
-                    subset_core = self._train_df[self._train_df.subj.isin(v_selected) & self._train_df.obj.isin(v_selected)]
+
+                    # filter the original train set with the list of entities
+                    subset_core_indices = self.numba_is_in_2d(previous_subset, v_selected)
+                    subset_core = previous_subset[subset_core_indices]
+                    previous_subset = subset_core.copy()
+
                     self._finalize_and_compute_stats(subset_core, k)
                     k += 1
 
@@ -89,7 +95,7 @@ class Subgraph:
 
         return self._subset_stats
 
-    def _train_valid_split(self, subset: pd.DataFrame):
+    def _train_valid_split(self, subset):
         """
         Randomly split the subset into train and valid sets
 
@@ -104,7 +110,7 @@ class Subgraph:
 
         return train, valid
 
-    def _filter_entities_relations(self, subset: pd.DataFrame):
+    def _filter_entities_relations(self, subset):
         """
         Filter entities and relations file and only keep those that appear in the subset. ALso reindex entities and
         relations for required density.
@@ -113,31 +119,34 @@ class Subgraph:
         :return: entities, relations, subset Dataframes
         """
 
+        selected_entity_ids = np.unique(subset[:, (0, 2)])
+        selected_relation_ids = np.unique(subset[:, 1])
+
         # only select entities and relations that appear in subset
-        entities = self._entities_df[(self._entities_df.index.isin(subset.subj)) |
-                                     (self._entities_df.index.isin(subset.obj))]
-        relations = self._relations_df[self._relations_df.index.isin(subset.rel)]
+        entities_indices = self.numba_is_in_1d(self._entity_ids, selected_entity_ids)
+        entities = self._entities[entities_indices]
+        relation_indices = self.numba_is_in_1d(self._relation_ids, selected_relation_ids)
+        relations = self._relations[relation_indices]
 
-        # add new dense index column
-        entities.insert(0, 'id_new', range(0, len(entities)))
-        relations.insert(0, 'id_new', range(0, len(relations)))
+        # reindex the entity and relation ids
+        new_entity_ids = np.arange(len(entities))
+        new_relation_ids = np.arange(len(relations))
 
-        # merge with subset to update ids
-        subset = subset.merge(entities.rename(columns={'id_new': 'subj_new'}), left_on='subj', right_index=True)
-        subset = subset.merge(entities.rename(columns={'id_new': 'obj_new'}), left_on='obj', right_index=True)
-        subset = subset.merge(relations.rename(columns={'id_new': 'rel_new'}), left_on='rel', right_index=True)
+        entity_mapper = np.empty(len(self._entity_ids), dtype=np.long)
+        relation_mapper = np.empty(len(self._relation_ids), dtype=np.long)
 
-        # only keep new columns and rename them
-        subset = subset[['subj_new', 'rel_new', 'obj_new']]
-        subset.rename(columns={'subj_new': 'subj', 'rel_new': 'rel', 'obj_new': 'obj'}, inplace=True)
-        entities = entities[['id_new', 'name']]
-        entities.rename(columns={'id_new': 'id'}, inplace=True)
-        relations = relations[['id_new', 'name']]
-        relations.rename(columns={'id_new': 'id'}, inplace=True)
+        entity_mapper[selected_entity_ids] = new_entity_ids
+        relation_mapper[selected_relation_ids] = new_relation_ids
 
-        return entities, relations, subset
+        for (i, mapper) in [(0, entity_mapper), (1, relation_mapper), (2, entity_mapper)]:
+            subset[:, i] = mapper[subset[:, i]]
 
-    def _finalize_and_compute_stats(self, subset: pd.DataFrame, core_number: int):
+        entities_new = np.vstack((new_entity_ids, entities)).transpose()
+        relations_new = np.vstack((new_relation_ids, relations)).transpose()
+
+        return entities_new, relations_new, subset
+
+    def _finalize_and_compute_stats(self, subset, core_number: int):
         """
         Reindex subset, relations, and entities. Save all files.
 
@@ -153,8 +162,8 @@ class Subgraph:
         train, valid = self._train_valid_split(subset)
 
         # compute relative computational savings compared to original dataset with and without scaling negative samples
-        rel_triples = len(train) / len(self._train_df)
-        rel_entities = len(entities) / len(self._entities_df)
+        rel_triples = len(train) / len(self._train)
+        rel_entities = len(entities) / len(self._entities)
 
         # add subset statistics to dict
         self._subset_stats[core_number] = {"entities": len(entities), "relations": len(relations), "train": len(train),
@@ -183,15 +192,42 @@ class Subgraph:
 
         # save subset files
         for k, subset in self._subsets.items():
-            subset[0].to_csv(f"{self._dataset.folder}/subsets/k-core/entity_ids_{k}_core.del", sep='\t', header=False,
-                             index=False)
-            subset[1].to_csv(f"{self._dataset.folder}/subsets/k-core/relation_ids_{k}_core.del", sep='\t', header=False,
-                             index=False)
-            subset[2].to_csv(f"{self._dataset.folder}/subsets/k-core/train_{k}_core.del", sep='\t', header=False,
-                             index=False)
-            subset[3].to_csv(f"{self._dataset.folder}/subsets/k-core/valid_{k}_core.del", sep='\t', header=False,
-                             index=False)
+            np.savetxt(f"{self._dataset.folder}/subsets/k-core/entity_ids_{k}_core.del", subset[0], delimiter="\t",
+                       newline="\n", fmt=b'%s')
+            np.savetxt(f"{self._dataset.folder}/subsets/k-core/relation_ids_{k}_core.del", subset[1], delimiter="\t",
+                       newline="\n", fmt=b'%s')
+            np.savetxt(f"{self._dataset.folder}/subsets/k-core/train_{k}_core.del", subset[2], delimiter="\t",
+                       newline="\n", fmt=b'%s')
+            np.savetxt(f"{self._dataset.folder}/subsets/k-core/valid_{k}_core.del", subset[3], delimiter="\t",
+                       newline="\n", fmt=b'%s')
 
+    @staticmethod
+    @numba.njit(parallel=True)
+    def numba_is_in_2d(arr, vec2):
 
+        out = np.empty(arr.shape[0], dtype=numba.boolean)
+        vec2_set = set(vec2)
 
+        for i in numba.prange(arr.shape[0]):
+            if arr[i][0] in vec2_set and arr[i][2] in vec2_set:
+                out[i] = True
+            else:
+                out[i] = False
+
+        return out
+
+    @staticmethod
+    @numba.njit(parallel=True)
+    def numba_is_in_1d(arr, vec2):
+
+        out = np.empty(arr.shape[0], dtype=numba.boolean)
+        vec2_set = set(vec2)
+
+        for i in numba.prange(arr.shape[0]):
+            if arr[i] in vec2_set:
+                out[i] = True
+            else:
+                out[i] = False
+
+        return out
 
