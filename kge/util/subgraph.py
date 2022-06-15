@@ -1,7 +1,5 @@
 import os
-import pandas as pd
 import numba
-import torch
 import numpy as np
 import igraph as ig
 from sklearn.model_selection import train_test_split
@@ -11,13 +9,9 @@ import yaml
 
 class Subgraph:
     """
-    Stores graph data (train, valid, test) and provides methods to perform compression
-    utilizing various strategies.
+    Subgraph class.
     """
 
-    TRIPLE_COLUMNS = ['subj', 'rel', 'obj']
-    TUPLE_COLUMN = ['name']
-    # todo: use hyperband seed?
     RANDOM_SEED = 0
 
     def __init__(self, dataset: Dataset):
@@ -37,10 +31,11 @@ class Subgraph:
 
     def get_k_core_stats(self):
         """
+        Provides stats about k-core subsets and performs the decomposition if they are not yet available.
         Select all entities that are contained in the k-cores (for all k) of the original graph and keep all
         interrelations. Note that multiple parallel edges only count as 1 due to the implementation.
 
-        :return: None
+        :return: subset_stats
         """
 
         # check if all files are already available. todo: May we assume that files re existent if stats are there?
@@ -49,6 +44,7 @@ class Subgraph:
                 self._subset_stats = yaml.safe_load(stream)
         except IOError:
 
+            # convert tensor to numpy array
             train_np = self._train.cpu().detach().numpy()
 
             # perform k-core decomposition
@@ -72,8 +68,8 @@ class Subgraph:
             # compute k-cores
             k = 1
             previous_subset = train_np
-            # todo: further optimization by filtering previous k-core subset instead of whole train
             while True:
+                # obtain entities of current k-core subgraph
                 core_indices = [v_idx for v_idx in range(len(vertices)) if core_numbers[v_idx] >= k]
                 k_core_graph = graph.subgraph(core_indices)
                 if k_core_graph.vcount() == 0:
@@ -83,11 +79,12 @@ class Subgraph:
                     # select all triples that are contained in k-core
                     v_selected = k_core_graph.get_vertex_dataframe().name.values
 
-                    # filter the original train set with the list of entities
+                    # filter the previous subgraph triples with the list of entities
                     subset_core_indices = self.numba_is_in_2d(previous_subset, v_selected)
                     subset_core = previous_subset[subset_core_indices]
                     previous_subset = subset_core.copy()
 
+                    # finalize all files and compute stats
                     self._finalize_and_compute_stats(subset_core, k)
                     k += 1
 
@@ -97,10 +94,10 @@ class Subgraph:
 
     def _train_valid_split(self, subset):
         """
-        Randomly split the subset into train and valid sets
+        Randomly split the subset into train and valid sets w.r.t. max amount
 
         :param subset: subset of original data to be divided into new train and valid
-        :return: train, valid Dataframes
+        :return: train, valid parts
         """
 
         if len(subset)*self._valid_frac < self._valid_max:
@@ -112,11 +109,11 @@ class Subgraph:
 
     def _filter_entities_relations(self, subset):
         """
-        Filter entities and relations file and only keep those that appear in the subset. ALso reindex entities and
+        Filter entities and relations and only keep those that appear in the subset. ALso reindex entities and
         relations for required density.
 
         :param subset: subset of original data to use for filtering
-        :return: entities, relations, subset Dataframes
+        :return: entities, relations, subset
         """
 
         selected_entity_ids = np.unique(subset[:, (0, 2)])
@@ -148,7 +145,7 @@ class Subgraph:
 
     def _finalize_and_compute_stats(self, subset, core_number: int):
         """
-        Reindex subset, relations, and entities. Save all files.
+        Finalize the subset creation and compute subset statistics.
 
         :param subset: subset of original data
         :param core_number: k-value of k-core
@@ -161,7 +158,7 @@ class Subgraph:
         # perform train-valid-split
         train, valid = self._train_valid_split(subset)
 
-        # compute relative computational savings compared to original dataset with and without scaling negative samples
+        # compute relative triples and entities compared to original graph
         rel_triples = len(train) / len(self._train)
         rel_entities = len(entities) / len(self._entities)
 
@@ -204,6 +201,9 @@ class Subgraph:
     @staticmethod
     @numba.njit(parallel=True)
     def numba_is_in_2d(arr, vec2):
+        """
+        Return filtering mask for values that occur in vec2.
+        """
 
         out = np.empty(arr.shape[0], dtype=numba.boolean)
         vec2_set = set(vec2)
@@ -219,6 +219,9 @@ class Subgraph:
     @staticmethod
     @numba.njit(parallel=True)
     def numba_is_in_1d(arr, vec2):
+        """
+        Return filtering mask for values that occur in vec2.
+        """
 
         out = np.empty(arr.shape[0], dtype=numba.boolean)
         vec2_set = set(vec2)
