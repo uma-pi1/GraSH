@@ -254,7 +254,7 @@ train:
   max_epochs: 20
 
   # Maximum number of batches to train per epoch
-  # relevant for hyperband search to train less than one epoch
+  # relevant for grash search to train less than one epoch
   # default: -1   train full epochs
   max_batches: -1
 
@@ -642,7 +642,7 @@ training_loss:
 # Options of hyperparameter search jobs (job.type=="search").
 search:
   # Type of search job (see respective configuration key). LibKGE ships with the
-  # following jobs: manual_search, grid_search, ax_search, hyperband_search
+  # following jobs: manual_search, grid_search, ax_search, grash_search
   type: ax_search
 
   # Maximum number of parallel training jobs to run during a search.
@@ -712,8 +712,8 @@ ax_search:
   parameter_constraints: []
 
 # Dynamic search job that picks configurations using HpBandSter
-hyperband_search:
-  class_name: HyperBandSearchJob
+grash_search:
+  class_name: GraSHSearchJob
 
   # Nameserver configuration required by HPBandSter
   run_id: ''
@@ -765,18 +765,6 @@ hyperband_search:
   # - 'epoch': only change epochs and use full graph
   # - 'graph': only change graph sizes and use static number of epochs
   variant: 'graph'
-
-  # Information about the available subsets. This should include:
-  # - name: name of suffix which is used in the subset filenames (use '' for full data)
-  # - num_entities: number of entities contained in the subset
-  # - num_relations: number of relations contained in the subset
-  # - num_train_triples: number of training triples contained in the subset
-  # - num_valid_triples: number of validation triples contained in the subset
-  # - estimated_power_usage: optional parameter for custom power estimates
-  subsets: []
-
-  # Number of Hyperband iterations (if set to 1, the search equals successive halving)
-  num_hpb_iter: 1
 
   # define successive halving round number as key and num distributed worker as value
   # for each device assigned to a trial define two workers

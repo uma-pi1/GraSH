@@ -5,6 +5,8 @@ import igraph as ig
 from sklearn.model_selection import train_test_split
 from kge import Dataset
 import yaml
+import pandas as pd
+import datetime
 
 
 class Subgraph:
@@ -42,7 +44,10 @@ class Subgraph:
         try:
             with open(f"{self._dataset.folder}/subsets/subset_stats.yaml", "r") as stream:
                 self._subset_stats = yaml.safe_load(stream)
+                # todo: write log-file message
         except IOError:
+
+            # todo: write log-file message
 
             # convert tensor to numpy array
             train_np = self._train.cpu().detach().numpy()
@@ -87,6 +92,8 @@ class Subgraph:
                     # finalize all files and compute stats
                     self._finalize_and_compute_stats(subset_core, k)
                     k += 1
+
+                    # todo: directly save files and write message into log file
 
             self._save_files()
 
@@ -189,14 +196,15 @@ class Subgraph:
 
         # save subset files
         for k, subset in self._subsets.items():
-            np.savetxt(f"{self._dataset.folder}/subsets/k-core/entity_ids_{k}_core.del", subset[0], delimiter="\t",
-                       newline="\n", fmt=b'%s')
-            np.savetxt(f"{self._dataset.folder}/subsets/k-core/relation_ids_{k}_core.del", subset[1], delimiter="\t",
-                       newline="\n", fmt=b'%s')
-            np.savetxt(f"{self._dataset.folder}/subsets/k-core/train_{k}_core.del", subset[2], delimiter="\t",
-                       newline="\n", fmt=b'%s')
-            np.savetxt(f"{self._dataset.folder}/subsets/k-core/valid_{k}_core.del", subset[3], delimiter="\t",
-                       newline="\n", fmt=b'%s')
+
+            pd.DataFrame(subset[0]).to_csv(f"{self._dataset.folder}/subsets/k-core/entity_ids_{k}_core.del", sep="\t",
+                                           header=False, index=False)
+            pd.DataFrame(subset[1]).to_csv(f"{self._dataset.folder}/subsets/k-core/relation_ids_{k}_core.del", sep="\t",
+                                           header=False, index=False)
+            pd.DataFrame(subset[2]).to_csv(f"{self._dataset.folder}/subsets/k-core/train_{k}_core.del", sep="\t",
+                                           header=False, index=False)
+            pd.DataFrame(subset[3]).to_csv(f"{self._dataset.folder}/subsets/k-core/valid_{k}_core.del", sep="\t",
+                                           header=False, index=False)
 
     @staticmethod
     @numba.njit(parallel=True)

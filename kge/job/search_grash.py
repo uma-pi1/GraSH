@@ -81,10 +81,10 @@ class HyperBandPatch(HyperBand):
         return super(HyperBandPatch, self).job_callback(job)
 
 
-class HyperBandSearchJob(AutoSearchJob):
+class GraSHSearchJob(AutoSearchJob):
     """
-    Job for hyperparameter search using HyperBand (Li et al. 2017)
-    Source: https://github.com/automl/HpBandSter
+    Job for hyperparameter search using GraSH (Kochsiek et al. 2022)
+    Source: todo: add github link
     """
 
     def __init__(self, config: Config, dataset, parent_job=None):
@@ -105,14 +105,14 @@ class HyperBandSearchJob(AutoSearchJob):
         # Assigning the port
         port = (
             None
-            if self.config.get("hyperband_search.port") == "None"
-            else self.config.get("hyperband_search.port")
+            if self.config.get("grash_search.port") == "None"
+            else self.config.get("grash_search.port")
         )
 
         # Assigning the address
         self.name_server = hpns.NameServer(
-            run_id=self.config.get("hyperband_search.run_id"),
-            host=self.config.get("hyperband_search.host"),
+            run_id=self.config.get("grash_search.run_id"),
+            host=self.config.get("grash_search.host"),
             port=port,
         )
         # Start the server
@@ -123,7 +123,7 @@ class HyperBandSearchJob(AutoSearchJob):
             for k, v in self.results[0].items():
                 self.trial_dict[k] = v
 
-        if self.config.get("hyperband_search.variant") != "epoch":
+        if self.config.get("grash_search.variant") != "epoch":
             # todo: replace by information from yaml-file in future and only load relevant subsets
 
             # add full dataset to subset dict and get k_core_stats
@@ -132,8 +132,10 @@ class HyperBandSearchJob(AutoSearchJob):
             self.subset_stats = subgraph.get_k_core_stats()
 
             # compute relative sizes and costs for the available subsets
-            cost_metric = self.config.get("hyperband_search.cost_metric")
-            # self.subset_stats = self.config.get("hyperband_search.subsets")
+            cost_metric = self.config.get("grash_search.cost_metric")
+            # self
+            #
+            # .subset_stats = self.config.get("grash_search.subsets")
             for i in range(len(self.subset_stats)):
                 # todo: auto weg
                 if cost_metric in ["auto", "triples_and_entities"]:
@@ -147,7 +149,7 @@ class HyperBandSearchJob(AutoSearchJob):
                     ]
                 else:
                     raise ValueError(
-                        f"Hyperband cost metric {cost_metric} is not supported."
+                        f"GraSH cost metric {cost_metric} is not supported."
                     )
 
         # worker_futures = []
@@ -155,11 +157,11 @@ class HyperBandSearchJob(AutoSearchJob):
         worker_logger = logging.getLogger("dummy")
         worker_logger.setLevel(logging.DEBUG)
         for i in range(self.config.get("search.num_workers")):
-            w = HyperBandWorker(
-                nameserver=self.config.get("hyperband_search.host"),
+            w = GraSHWorker(
+                nameserver=self.config.get("grash_search.host"),
                 # logger=logging.getLogger('dummy'),
                 logger=worker_logger,
-                run_id=self.config.get("hyperband_search.run_id"),
+                run_id=self.config.get("grash_search.run_id"),
                 job_config=self.config,
                 parent_job=self,
                 trial_dict=self.trial_dict,
@@ -255,26 +257,26 @@ class HyperBandSearchJob(AutoSearchJob):
         # high number as upper limit is handled by hpb
         workers_per_round = defaultdict(lambda: 10000)
         workers_per_round.update(
-            self.config.get("hyperband_search.num_search_worker_per_round")
+            self.config.get("grash_search.num_search_worker_per_round")
         )
 
-        # Determine Hyperband configuration
-        num_trials = self.config.get("hyperband_search.num_trials")
-        eta = self.config.get("hyperband_search.eta")
+        # Determine corresponding Hyperband configuration for GraSH configuration
+        num_trials = self.config.get("grash_search.num_trials")
+        eta = self.config.get("grash_search.eta")
         sh_rounds = math.log(num_trials, eta)
         if not sh_rounds.is_integer():
             if self.config.get("job.auto_correct"):
                 sh_rounds = math.floor(sh_rounds)
                 num_trials = eta ** sh_rounds
                 self.config.log(
-                    "Setting hyperband.num_trials to {}, was set to {} and needs to "
+                    "Setting grash_search.num_trials to {}, was set to {} and needs to "
                     "equal a positive integer power of eta.".format(num_trials,
-                                                                    self.config.get("hyperband_search.num_trials"))
+                                                                    self.config.get("grash_search.num_trials"))
                 )
                 # todo: update config file?
             else:
                 raise Exception(
-                    "hyperband.num_trials was set to {}, "
+                    "grash_search.num_trials was set to {}, "
                     "needs to equal a positive integer power of eta.".format(num_trials)
                 )
         self.sh_rounds = int(sh_rounds)
@@ -283,10 +285,10 @@ class HyperBandSearchJob(AutoSearchJob):
         hpb = HyperBandPatch(
             free_devices=self.free_devices,
             configspace=self.workers[0].get_configspace(
-                self.config, self.config.get("hyperband_search.seed")
+                self.config, self.config.get("grash_search.seed")
             ),
-            run_id=self.config.get("hyperband_search.run_id"),
-            nameserver=self.config.get("hyperband_search.host"),
+            run_id=self.config.get("grash_search.run_id"),
+            nameserver=self.config.get("grash_search.host"),
             result_logger=result_logger,
             # previous_result=previous_run,
             eta=eta,
@@ -300,8 +302,9 @@ class HyperBandSearchJob(AutoSearchJob):
 
         # Run it
         print("run hpo search")
+        # set n_iterations to 1 to get a Successive Halving search
         hpb.run(
-            n_iterations=self.config.get("hyperband_search.num_hpb_iter"),
+            n_iterations=1,
             min_n_workers=self.config.get("search.num_workers"),
         )
 
@@ -312,9 +315,9 @@ class HyperBandSearchJob(AutoSearchJob):
             p.terminate()
 
 
-class HyperBandWorker(Worker):
+class GraSHWorker(Worker):
     """
-    Class of a worker for the HyperBand hyper-parameter optimization algorithm.
+    Class of a worker for the GraSH hyper-parameter optimization algorithm.
     """
 
     def __init__(self, *args, **kwargs):
@@ -326,7 +329,7 @@ class HyperBandWorker(Worker):
         self.search_worker_id = kwargs.get("id")
         super().__init__(*args, **kwargs)
         self.next_trial_no = 0
-        self.search_budget = self.parent_job.config.get("hyperband_search.search_budget")
+        self.search_budget = self.parent_job.config.get("grash_search.search_budget")
 
     def compute(self, config_id, config, budget, **kwargs):
         try:
@@ -388,19 +391,19 @@ class HyperBandWorker(Worker):
         # other rounds
         if sh_iter < self.parent_job.sh_rounds:
             budget = budget * (self.parent_job.config.get(
-                "hyperband_search.search_budget") / self.parent_job.sh_rounds)
+                "grash_search.search_budget") / self.parent_job.sh_rounds)
 
         # determine the epochs for this trial
-        if self.parent_job.config.get("hyperband_search.variant") == "graph":
+        if self.parent_job.config.get("grash_search.variant") == "graph":
             epochs = self.parent_job.config.get("train.max_epochs")
-        elif self.parent_job.config.get("hyperband_search.variant") == "combined":
+        elif self.parent_job.config.get("grash_search.variant") == "combined":
             # share savings equally between graph and epochs by taking the square root
             budget = math.sqrt(budget)
             epochs = math.floor(
                 self.parent_job.config.get("train.max_epochs")
                 * budget
             )
-        elif self.parent_job.config.get("hyperband_search.variant") == "epoch":
+        elif self.parent_job.config.get("grash_search.variant") == "epoch":
             epochs = (
                 self.parent_job.config.get("train.max_epochs")
                 * budget
@@ -421,7 +424,7 @@ class HyperBandWorker(Worker):
             print("num epochs", epochs)
 
         # determine the subset for this trial
-        if self.parent_job.config.get("hyperband_search.variant") != "epoch":
+        if self.parent_job.config.get("grash_search.variant") != "epoch":
             # determine and set the dataset to use based on the budget
             subset_index = -1
             for i in range(len(self.parent_job.subset_stats)):
@@ -447,7 +450,7 @@ class HyperBandWorker(Worker):
             number_samples_s = parameters.get("negative_sampling.num_samples.s")
             negatives_scaler = max(
                 self.parent_job.subset_stats[subset_index]["rel_entities"],
-                self.parent_job.config.get("hyperband_search.min_negatives_percentage"),
+                self.parent_job.config.get("grash_search.min_negatives_percentage"),
             )
             conf.set(
                 "negative_sampling.num_samples.s",
@@ -464,13 +467,13 @@ class HyperBandWorker(Worker):
                 predecessor_trial_id = str("{:02d}".format(hpb_iter)) + str("{:02d}".format(sh_iter - 1)) + str(
                     "{:04d}".format(config_no))
                 path_to_model = ""
-                if conf.get("hyperband_search.keep_initialization"):
+                if conf.get("grash_search.keep_initialization"):
                     path_to_model = os.path.join(
                         f"{os.path.dirname(conf.folder)}",
                         f"{predecessor_trial_id}",
                         f"model_00000.pt",
                     )
-                if conf.get("hyperband_search.keep_pretrained"):
+                if conf.get("grash_search.keep_pretrained"):
                     path_to_model = os.path.join(
                         f"{os.path.dirname(conf.folder)}",
                         f"{predecessor_trial_id}",
@@ -486,7 +489,7 @@ class HyperBandWorker(Worker):
             conf.set("valid.every", epochs)
 
         # define distributed setup
-        distributed_workers_per_round = self.parent_job.config.get("hyperband_search.distributed_worker_per_round")
+        distributed_workers_per_round = self.parent_job.config.get("grash_search.distributed_worker_per_round")
         if str(sh_iter) in distributed_workers_per_round.keys():
             # change to distributed model if not yet defined
             if "distributed" not in conf.get("model"):
@@ -525,47 +528,9 @@ class HyperBandWorker(Worker):
         # save config.yaml
         conf.init_folder()
 
-        # todo: make this less hacky
-        # todo: also save a checkpoint for the hyperband search, to avoid this
-        # todo: this may work for successive halving but will fail for any other approach
-        # check if last checkpoint in folder is > max_epochs to skip, to avoid loading
-        # of checkpoint
-        # last_checkpoint_number = conf.last_checkpoint_number()
-        # if last_checkpoint_number is not None and last_checkpoint_number >= conf.get("train.max_epochs"):
-        """
-        valid_metric = conf.get("valid.metric")
-
-        def get_best_score(trace_path):
-            # we need to get the best mrr here
-            best_score = -1
-            max_epoch = -1
-            if not os.path.exists(trace_path):
-                return best_score, max_epoch
-            with open(trace_path) as trace:
-                for line in trace.readlines():
-                    if valid_metric in line:
-                        line = yaml.load(line, Loader=yaml.SafeLoader)
-                        best_score = max(best_score, line[valid_metric])
-                    elif 'train_completed' in line:
-                        max_epoch = 1
-                    else:
-                        continue
-
-            return best_score, max_epoch
-
-        if "distributed" in conf.get("model"):
-            trace_path = os.path.join(conf.folder, "worker-0", "trace.yaml")
-        else:
-            trace_path = os.path.join(conf.folder, "trace.yaml")
-        best_score, max_epoch = get_best_score(trace_path)
-        if best_score >= 0 and max_epoch == 1: #>= conf.get("train.max_epochs"):
-            conf.log(f"Trial {conf.folder} registered with {valid_metric} {best_score}")
-            return {"loss": 1 - best_score, "info": {}}
-        """
-
         # copy last checkpoint from previous sh round to new folder for epoch only variant
         if (
-            self.parent_job.config.get("hyperband_search.variant") == "epoch"
+            self.parent_job.config.get("grash_search.variant") == "epoch"
             and sh_iter != 0
         ):
             copied = False
@@ -608,9 +573,9 @@ class HyperBandWorker(Worker):
         # save package checkpoint
         args = Namespace()
         args.checkpoint = None
-        if conf.get("hyperband_search.keep_initialization"):
+        if conf.get("grash_search.keep_initialization"):
             args.checkpoint = f"{conf.folder}/checkpoint_00000.pt"
-        if conf.get("hyperband_search.keep_pretrained"):
+        if conf.get("grash_search.keep_pretrained"):
             args.checkpoint = f"{conf.folder}/checkpoint_best.pt"
         if args.checkpoint is not None:
             args.file = None
@@ -646,7 +611,7 @@ class HyperBandWorker(Worker):
         self.parent_job.config.log("Saving checkpoint to {}...".format(filename))
         torch.save(
             {
-                "type": "search_hyperband",
+                "type": "search_grash",
                 "parameters": [],
                 "results": [self.trial_dict._getvalue()],
                 "job_id": self.parent_job.job_id,
@@ -666,7 +631,7 @@ class HyperBandWorker(Worker):
         """
         config_space = CS.ConfigurationSpace(seed=seed)
 
-        parameters = config.get("hyperband_search.parameters")
+        parameters = config.get("grash_search.parameters")
         for p in parameters:
             v_name = p["name"]
             v_type = p["type"]

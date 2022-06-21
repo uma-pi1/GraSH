@@ -783,19 +783,24 @@ def _process_deprecated_options(options: Dict[str, Any]):
                     renamed_keys.add(key)
         return renamed_keys
 
+    # 21.06.22
+    rename_key("hyperband_search", "grash_search")
+    delete_key_with_value("grash_search.subsets", [])
+    delete_key_with_value("grash_search.num_hpb_iter", 1)
+
     # 21.04.22
-    delete_key_with_value("hyperband_search.epoch_budget_tolerance", [0, 0, 0, 0, 0])
-    delete_key_with_value("hyperband_search.max_epoch_budget", 400)
-    rename_value("hyperband_search.variant", "dataset", "graph")
-    rename_value("hyperband_search.variant", "epochs", "epoch")
-    rename_value("hyperband_search.variant", "both", "combined")
+    delete_key_with_value("grash_search.epoch_budget_tolerance", [0, 0, 0, 0, 0])
+    delete_key_with_value("grash_search.max_epoch_budget", 400)
+    rename_value("grash_search.variant", "dataset", "graph")
+    rename_value("grash_search.variant", "epochs", "epoch")
+    rename_value("grash_search.variant", "both", "combined")
     rename_key("train.auto_correct", "job.auto_correct")
 
     # 17.03.22
-    delete_key_with_value("hyperband_search.max_sh_rounds", 4)
+    delete_key_with_value("grash_search.max_sh_rounds", 4)
 
     # 04.02.22
-    delete_key_with_value("hyperband_search.num_workers", 1)
+    delete_key_with_value("grash_search.num_workers", 1)
 
     # 03.11.21
     delete_key_with_value("job.distributed.load_batch", True)
