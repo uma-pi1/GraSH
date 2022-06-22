@@ -784,9 +784,11 @@ def _process_deprecated_options(options: Dict[str, Any]):
         return renamed_keys
 
     # 21.06.22
-    rename_key("hyperband_search", "grash_search")
+    rename_keys_re(r"^hyperband_search\.", "grash_search.")
     delete_key_with_value("grash_search.subsets", [])
     delete_key_with_value("grash_search.num_hpb_iter", 1)
+    rename_value("search.type", "hyperband_search", "grash_search")
+    rename_value("grash_search.class_name", "HyperBandSearchJob", "GraSHSearchJob")
 
     # 21.04.22
     delete_key_with_value("grash_search.epoch_budget_tolerance", [0, 0, 0, 0, 0])
