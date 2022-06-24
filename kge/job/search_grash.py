@@ -2,33 +2,30 @@ import concurrent.futures
 import logging
 import numpy as np
 import torch.cuda
-
-from kge.job import AutoSearchJob
-from kge import Config
-from kge import Dataset
-import kge.job.search
-from kge.util.package import package_model
-from kge.config import _process_deprecated_options
 import copy
 import math
 import ConfigSpace as CS
+import kge.job.search
 import ConfigSpace.hyperparameters as CSH
 import hpbandster.core.nameserver as hpns
 import hpbandster.core.result as hpres
+import os
+import sys
+import shutil
+import time
+import gc
+import torch.multiprocessing as mp
+
+from kge.job import AutoSearchJob
+from kge import Config, Dataset
+from kge.util.package import package_model
+from kge.config import _process_deprecated_options
 from hpbandster.optimizers import HyperBand
 from hpbandster.core.worker import Worker
 from argparse import Namespace
-import os
-import sys
-import yaml
-import shutil
 from collections import defaultdict
-import torch.multiprocessing as mp
 from multiprocessing import Manager
-import time
-import gc
 from kge.util import Subgraph
-from kge.util import load_checkpoint
 
 
 class HyperBandPatch(HyperBand):

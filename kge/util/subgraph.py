@@ -2,11 +2,9 @@ import os
 import numba
 import numpy as np
 import igraph as ig
-from sklearn.model_selection import train_test_split
 from kge import Dataset
 import yaml
 import pandas as pd
-import datetime
 
 
 class Subgraph:
@@ -15,6 +13,8 @@ class Subgraph:
     """
 
     RANDOM_SEED = 0
+    # set random seed for train-valid-split
+    np.random.seed(0)
 
     def __init__(self, dataset: Dataset):
 
@@ -107,10 +107,12 @@ class Subgraph:
         :return: train, valid parts
         """
 
-        if len(subset)*self._valid_frac < self._valid_max:
-            train, valid = train_test_split(subset, test_size=self._valid_frac, random_state=self.RANDOM_SEED)
-        else:
-            train, valid = train_test_split(subset, test_size=self._valid_max, random_state=self.RANDOM_SEED)
+        number_valid = round(len(subset)*self._valid_frac)
+        if number_valid > self._valid_max:
+            number_valid = self._valid_max
+
+        np.random.shuffle(subset)
+        valid, train = subset[:number_valid, :], subset[number_valid:, :]
 
         return train, valid
 
