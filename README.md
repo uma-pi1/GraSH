@@ -1,4 +1,4 @@
-# Dist-KGE: A knowledge graph embedding library for multi-GPU and multi-machine training
+# GraSH: Knowledge Graph Successive Halving
 
 
 This is the code and configuration accompanying the paper ["Parallel Training of Knowledge Graph Embedding Models: A Comparison of Techniques"](https://vldb.org/pvldb/vol15/p633-kochsiek.pdf).
