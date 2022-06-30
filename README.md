@@ -77,6 +77,25 @@ Epoch    	|   3	|   4		|   0.536   |  0.460	|   0.672   |   0.601   	|  [config]
 Graph    	|   3	|   4		|   0.463   |  0.375	|   0.634   |   0.800   	|  [config](examples/experiments/search_configs/yago3-10/search-complex-yago-graph.yaml)
 Combined   	|   3	|   4		|   0.528   |  0.455	|   0.660   |   0.772   	|  [config](examples/experiments/search_configs/yago3-10/search-complex-yago-combined.yaml)
 
+**RotatE**
+
+Variant		| B		|  	η  		|   MRR 	|  Hits@1  	|   Hits@10 |   Hits@100    | config
+----    	| ----- |   ----:   |   ----:   |   ----:   |   ----:   |   ----:   	|   ----
+Epoch    	|   3	|   4		|   0.432   |  0.337	|   0.619   |   0.768   	|  [config](examples/experiments/search_configs/yago3-10/search-rotate-yago-epoch.yaml)
+Graph    	|   3	|   4		|   0.432   |  0.337	|   0.619   |   0.768   	|  [config](examples/experiments/search_configs/yago3-10/search-rotate-yago-graph.yaml)
+Combined   	|   3	|   4		|   0.434   |  0.342	|   0.607   |   0.742   	|  [config](examples/experiments/search_configs/yago3-10/search-rotate-yago-combined.yaml)
+
+**TransE**
+
+Variant		| B		|  	η  		|   MRR 	|  Hits@1  	|   Hits@10 |   Hits@100    | config
+----    	| ----- |   ----:   |   ----:   |   ----:   |   ----:   |   ----:   	|   ----
+Epoch    	|   3	|   4		|   0.499   |  0.406	|   0.661   |   0.794   	|  [config](examples/experiments/search_configs/yago3-10/search-transe-yago-epoch.yaml)
+Graph    	|   3	|   4		|   0.422   |  0.311	|   0.628   |   0.802   	|  [config](examples/experiments/search_configs/yago3-10/search-transe-yago-graph.yaml)
+Combined   	|   3	|   4		|   0.499   |  0.406	|   0.661   |   0.794   	|  [config](examples/experiments/search_configs/yago3-10/search-transe-yago-combined.yaml)
+
+
+
+
 
 # How to cite
 ```
