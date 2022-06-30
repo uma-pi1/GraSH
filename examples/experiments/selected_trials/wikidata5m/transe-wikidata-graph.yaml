@@ -1,0 +1,75 @@
+dataset:
+  name: wikidata5m
+entity_ranking:
+  chunk_size: 5000
+eval:
+  batch_size: 256
+import:
+- transe
+job:
+  type: train
+lookup_embedder:
+  class_name: LookupEmbedder
+  dim: 128
+  dropout: 0.0
+  initialize: normal_
+  initialize_args:
+    normal_:
+      mean: 0.0
+      std: 0.009649904852965529
+    uniform_:
+      a: -0.01720505555737173
+    xavier_normal_:
+      gain: 1.0
+    xavier_uniform_:
+      gain: 1.0
+  normalize:
+    p: -1.0
+  regularize: lp
+  regularize_args:
+    p: 1
+    weighted: true
+  sparse: true
+model: transe
+negative_sampling:
+  class_name: TrainingJobNegativeSampling
+  implementation: batch
+  num_samples:
+    o: 577
+    p: 0
+    s: 651
+  sampling_type: uniform
+  shared: true
+  shared_type: default
+  with_replacement: false
+train:
+  auto_correct: true
+  batch_size: 1024
+  loss: kl
+  loss_arg: 1.0
+  max_epochs: 64
+  num_workers: 0
+  optimizer:
+    default:
+      args:
+        lr: 0.024585362206194335
+      type: Adagrad
+  type: negative_sampling
+transe:
+  class_name: TransE
+  entity_embedder:
+    dropout: 0.05736738753020165
+    regularize_weight: 0.00031808122784636683
+    type: lookup_embedder
+  l_norm: 1.0
+  relation_embedder:
+    dropout: -0.047988383628424724
+    regularize_weight: 1.4606157990863213e-10
+    type: lookup_embedder
+valid:
+  early_stopping:
+    patience: 0
+    threshold:
+      epochs: 0
+      metric_value: 0.0
+  every: 4

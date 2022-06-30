@@ -1,0 +1,75 @@
+complex:
+  class_name: ComplEx
+  entity_embedder:
+    dropout: -0.3544049709300934
+    regularize_weight: 1.6264961100212127e-10
+    type: lookup_embedder
+  relation_embedder:
+    dropout: 0.49578630555558545
+    regularize_weight: 8.552051698702295e-20
+    type: lookup_embedder
+dataset:
+  name: wikidata5m
+entity_ranking:
+  chunk_size: 50000
+eval:
+  batch_size: 128
+import:
+- complex
+job:
+  auto_correct: true
+  type: train
+lookup_embedder:
+  class_name: LookupEmbedder
+  dim: 128
+  dropout: 0.0
+  initialize: xavier_uniform_
+  initialize_args:
+    normal_:
+      mean: 0.0
+      std: 0.015600974164869342
+    uniform_:
+      a: -0.42509770087271137
+    xavier_normal_:
+      gain: 1.0
+    xavier_uniform_:
+      gain: 1.0
+  normalize:
+    p: -1.0
+  regularize: lp
+  regularize_args:
+    p: 3
+    weighted: true
+  regularize_weight: 0.0
+  sparse: true
+model: complex
+negative_sampling:
+  class_name: TrainingJobNegativeSampling
+  implementation: batch
+  num_samples:
+    o: 7467
+    p: 0
+    s: 5735
+  sampling_type: uniform
+  shared: true
+  shared_type: default
+  with_replacement: false
+train:
+  batch_size: 1024
+  loss: kl
+  loss_arg: 1.0
+  max_epochs: 64
+  num_workers: 0
+  optimizer:
+    default:
+      args:
+        lr: 0.11345708649220962
+      type: Adagrad
+  type: negative_sampling
+valid:
+  early_stopping:
+    patience: 0
+    threshold:
+      epochs: 0
+      metric_value: 0.0
+  every: 4

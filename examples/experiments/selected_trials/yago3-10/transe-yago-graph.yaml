@@ -1,0 +1,75 @@
+dataset:
+  name: yago3-10
+entity_ranking:
+  chunk_size: 5000
+eval:
+  batch_size: 128
+import:
+- transe
+job:
+  type: train
+lookup_embedder:
+  class_name: LookupEmbedder
+  dim: 128
+  dropout: 0.0
+  initialize: normal_
+  initialize_args:
+    normal_:
+      mean: 0.0
+      std: 0.007494931596154339
+    uniform_:
+      a: -0.5231613601704841
+    xavier_normal_:
+      gain: 1.0
+    xavier_uniform_:
+      gain: 1.0
+  normalize:
+    p: -1.0
+  regularize: ''
+  regularize_args:
+    p: 2
+    weighted: true
+  sparse: true
+model: transe
+negative_sampling:
+  class_name: TrainingJobNegativeSampling
+  implementation: batch
+  num_samples:
+    o: 749
+    p: 0
+    s: 799
+  sampling_type: uniform
+  shared: true
+  shared_type: default
+  with_replacement: false
+train:
+  auto_correct: true
+  batch_size: 1024
+  loss: kl
+  loss_arg: 1.0
+  max_epochs: 400
+  num_workers: 0
+  optimizer:
+    default:
+      args:
+        lr: 0.02461844506902701
+      type: Adagrad
+  type: negative_sampling
+transe:
+  class_name: TransE
+  entity_embedder:
+    dropout: -0.2791620849385381
+    regularize_weight: 0.0028230221466212066
+    type: lookup_embedder
+  l_norm: 1.0
+  relation_embedder:
+    dropout: 0.09208457766637634
+    regularize_weight: 3.788962261275329e-14
+    type: lookup_embedder
+valid:
+  early_stopping:
+    patience: 50
+    threshold:
+      epochs: 10
+      metric_value: 0.05
+  every: 5

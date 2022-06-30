@@ -1,0 +1,132 @@
+complex:
+  class_name: ComplEx
+  entity_embedder:
+    dropout: -0.3079277036063969
+    regularize_weight: 6.133704575304271e-07
+    type: lookup_embedder
+  relation_embedder:
+    dropout: 0.2849367034311311
+    regularize_weight: 0.029503185506935665
+    type: lookup_embedder
+dataset:
+  files:
+    test:
+      filename: test.del
+      type: triples
+    test_small:
+      filename: test_small.del
+      type: triples
+    test_tiny:
+      filename: test_tiny.del
+      type: triples
+    train:
+      filename: train.del
+      type: triples
+    valid:
+      filename: valid.del
+      type: triples
+    valid_small:
+      filename: valid_small.del
+      type: triples
+    valid_tiny:
+      filename: valid_tiny.del
+      type: triples
+  name: freebase
+distributed_model:
+  base_model:
+    type: complex
+entity_ranking:
+  chunk_size: 50000
+  class_name: EntityRankingJob
+  filter_splits:
+  - train
+  - valid
+  filter_with_test: true
+eval:
+  batch_size: 256
+  num_workers: 0
+  split: valid_tiny
+  trace_level: epoch
+  type: entity_ranking
+import:
+- complex
+- distributed_model
+job:
+  device: cuda:0
+  device_pool:
+  - cuda:0
+  - cuda:1
+  - cuda:2
+  - cuda:3
+  distributed:
+    num_eval_workers: 1
+    num_partitions: 2
+    num_workers: 2
+    parameter_server: shared
+    partition_type: random
+    repartition_epoch: true
+  type: train
+lookup_embedder:
+  class_name: LookupEmbedder
+  dim: 128
+  dropout: 0.0
+  initialize: xavier_normal_
+  initialize_args:
+    normal_:
+      mean: 0.0
+      std: 8.734825957927893e-05
+    uniform_:
+      a: -0.530623383098394
+    xavier_normal_:
+      gain: 1.0
+    xavier_uniform_:
+      gain: 1.0
+  normalize:
+    p: -1.0
+  pretrain:
+    ensure_all: false
+    model_filename: ''
+  regularize: ''
+  regularize_args:
+    p: 2
+    weighted: true
+  regularize_weight: 0.0
+  sparse: true
+model: distributed_model
+negative_sampling:
+  class_name: TrainingJobNegativeSampling
+  implementation: batch
+  num_samples:
+    o: 4889
+    p: 0
+    s: 9280
+  sampling_type: uniform
+  shared: true
+  shared_type: default
+  with_replacement: false
+train:
+  abort_on_nan: true
+  auto_correct: true
+  batch_size: 1024
+  loss: kl
+  loss_arg: 1.0
+  max_epochs: 10
+  num_workers: 4
+  optimizer:
+    default:
+      args:
+        lr: 0.17856842543059595
+      type: dist_rowadagrad
+  split: train
+  trace_level: epoch
+  type: distributed_negative_sampling
+valid:
+  early_stopping:
+    patience: 0
+    threshold:
+      epochs: 0
+      metric_value: 0.0
+  every: 1
+  metric: mean_reciprocal_rank_filtered
+  split: valid_tiny
+  trace_level: epoch

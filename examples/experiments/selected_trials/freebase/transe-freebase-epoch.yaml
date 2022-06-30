@@ -1,0 +1,132 @@
+dataset:
+  files:
+    test:
+      filename: test.del
+      type: triples
+    test_small:
+      filename: test_small.del
+      type: triples
+    test_tiny:
+      filename: test_tiny.del
+      type: triples
+    train:
+      filename: train.del
+      type: triples
+    valid:
+      filename: valid.del
+      type: triples
+    valid_small:
+      filename: valid_small.del
+      type: triples
+    valid_tiny:
+      filename: valid_tiny.del
+      type: triples
+  name: freebase
+distributed_model:
+  base_model:
+    type: transe
+entity_ranking:
+  chunk_size: 40000
+  class_name: EntityRankingJob
+  filter_splits:
+  - train
+  - valid
+  filter_with_test: true
+eval:
+  batch_size: 100
+  split: valid
+  trace_level: epoch
+  type: entity_ranking
+import:
+- distributed_model
+- transe
+job:
+  device: cuda
+  device_pool:
+  - cuda:2
+  - cuda:3
+  - cuda:0
+  - cuda:1
+  distributed:
+    num_eval_workers: 1
+    num_partitions: 8
+    num_workers: 8
+    parameter_server: shared
+    partition_type: random
+    repartition_epoch: true
+  type: train
+lookup_embedder:
+  class_name: LookupEmbedder
+  dim: 128
+  dropout: 0.0
+  initialize: normal_
+  initialize_args:
+    normal_:
+      mean: 0.0
+      std: 0.0015667998768052584
+    uniform_:
+      a: -0.14577789743147473
+    xavier_normal_:
+      gain: 1.0
+    xavier_uniform_:
+      gain: 1.0
+  normalize:
+    p: -1.0
+  pretrain:
+    ensure_all: false
+    model_filename: ''
+  regularize: lp
+  regularize_args:
+    p: 1
+    weighted: true
+  regularize_weight: 0.0
+  sparse: true
+model: distributed_model
+negative_sampling:
+  class_name: TrainingJobNegativeSampling
+  implementation: batch
+  num_samples:
+    o: 949
+    p: 0
+    s: 701
+  sampling_type: uniform
+  shared: true
+  shared_type: default
+  with_replacement: false
+train:
+  abort_on_nan: true
+  auto_correct: true
+  batch_size: 1024
+  loss: kl
+  loss_arg: 1.0
+  max_epochs: 10
+  num_workers: 4
+  optimizer:
+    default:
+      args:
+        lr: 0.2743569946544049
+      type: dist_rowadagrad
+  split: train
+  trace_level: epoch
+  type: distributed_negative_sampling
+transe:
+  class_name: TransE
+  entity_embedder:
+    dropout: -0.45450269414413114
+    regularize_weight: 1.140746854660462e-19
+    type: lookup_embedder
+  l_norm: 1.0
+  relation_embedder:
+    dropout: 0.24273727354962882
+    regularize_weight: 6.152366886516973e-15
+    type: lookup_embedder
+valid:
+  early_stopping:
+    patience: 0
+    threshold:
+      epochs: 0
+      metric_value: 0.0
+  every: 1
+  metric: mean_reciprocal_rank_filtered
+  split: valid_tiny
+  trace_level: epoch
