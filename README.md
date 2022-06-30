@@ -71,11 +71,11 @@ By default, each experiment will create a new folder in `local/experiments/<time
 #### Yago3-10
 **ComplEx**
 
-Variant v  	|   Search Budget B |  Reduction Factor η  	|   MRR 	|  Hits@1  	|   Hits@10 |   Hits@100    | config
-----    	|   -----   		|   ----:   			|   ----:   |   ----:   |   ----:   |   ----:   	|   ----
-Epoch    	|   3		   		|   4		   			|   0.536   |  0.460	|   0.672   |   0.601   	|  [config](examples/experiments/search_configs/yago3-10/search-complex-yago-epoch.yaml)
-Graph    	|   3		   		|   4		   			|   0.463   |  0.375	|   0.634   |   0.800   	|  [config](examples/experiments/search_configs/yago3-10/search-complex-yago-graph.yaml)
-Combined   	|   3		   		|   4		   			|   0.528   |  0.455	|   0.660   |   0.772   	|  [config](examples/experiments/search_configs/yago3-10/search-complex-yago-combined.yaml)
+Variant		| B		|  	η  		|   MRR 	|  Hits@1  	|   Hits@10 |   Hits@100    | config
+----    	| ----- |   ----:   |   ----:   |   ----:   |   ----:   |   ----:   	|   ----
+Epoch    	|   3	|   4		|   0.536   |  0.460	|   0.672   |   0.601   	|  [config](examples/experiments/search_configs/yago3-10/search-complex-yago-epoch.yaml)
+Graph    	|   3	|   4		|   0.463   |  0.375	|   0.634   |   0.800   	|  [config](examples/experiments/search_configs/yago3-10/search-complex-yago-graph.yaml)
+Combined   	|   3	|   4		|   0.528   |  0.455	|   0.660   |   0.772   	|  [config](examples/experiments/search_configs/yago3-10/search-complex-yago-combined.yaml)
 
 
 # How to cite
