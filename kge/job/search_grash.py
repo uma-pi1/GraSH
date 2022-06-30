@@ -169,11 +169,10 @@ class GraSHSearchJob(AutoSearchJob):
             # todo: figure out why the process pool is not starting the jobs
             print(f"starting process hpb-worker-process {i}")
 
-            # fniesel windows change
-            w.run(background=True)
-            # p = mp.Process(target=w.run, args=(False,))
-            # self.processes.append(p)
-            # p.start()
+            # w.run(background=True)
+            p = mp.Process(target=w.run, args=(False,))
+            self.processes.append(p)
+            p.start()
 
             # future = self.process_pool.submit(w.run, w, False)
             # worker_futures.append(future)
