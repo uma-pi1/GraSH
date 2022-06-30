@@ -70,21 +70,45 @@ By default, each experiment will create a new folder in `local/experiments/<time
 
 #### Yago3-10
 
-Model		|Variant		| B		|  	η  		|   MRR 	|  Hits@1  	|   Hits@10 |   Hits@100    | config
-----    	|----    	| ----- |   ----:   |   ----:   |   ----:   |   ----:   |   ----:   	|   ----
-ComplEx    	|Epoch    	|   3	|   4		|   0.536   |  0.460	|   0.672   |   0.601   	|  [config](examples/experiments/selected_trials/yago3-10/complex-yago-epoch.yaml)
-ComplEx    	|Graph    	|   3	|   4		|   0.463   |  0.375	|   0.634   |   0.800   	|  [config](examples/experiments/selected_trials/yago3-10/complex-yago-graph.yaml)
-ComplEx   	|Combined   	|   3	|   4		|   0.528   |  0.455	|   0.660   |   0.772   	|  [config](examples/experiments/selected_trials/yago3-10/complex-yago-combined.yaml)
-RotatE    	|Epoch    	|   3	|   4		|   0.432   |  0.337	|   0.619   |   0.768   	|  [config](examples/experiments/selected_trials/yago3-10/rotate-yago-epoch.yaml)
-RotatE    	|Graph    	|   3	|   4		|   0.432   |  0.337	|   0.619   |   0.768   	|  [config](examples/experiments/selected_trials/yago3-10/rotate-yago-graph.yaml)
-RotatE   	|Combined   	|   3	|   4		|   0.434   |  0.342	|   0.607   |   0.742   	|  [config](examples/experiments/selected_trials/yago3-10/rotate-yago-combined.yaml)
-TransE    	|Epoch    	|   3	|   4		|   0.499   |  0.406	|   0.661   |   0.794   	|  [config](examples/experiments/selected_trials/yago3-10/transe-yago-epoch.yaml)
-TransE    	|Graph    	|   3	|   4		|   0.422   |  0.311	|   0.628   |   0.802   	|  [config](examples/experiments/selected_trials/yago3-10/transe-yago-graph.yaml)
-TransE   	|Combined   	|   3	|   4		|   0.499   |  0.406	|   0.661   |   0.794   	|  [config](examples/experiments/selected_trials/yago3-10/transe-yago-combined.yaml)
+Model		|Variant	|   MRR 	|  Hits@1  	|   Hits@10 |   Hits@100    | config
+----    	|----    	|   ----:   |   ----:   |   ----:   |   ----:   	|   ----
+ComplEx    	|Epoch    	|   0.536   |  0.460	|   0.672   |   0.601   	|  [config](examples/experiments/selected_trials/yago3-10/complex-yago-epoch.yaml)
+ComplEx    	|Graph    	|   0.463   |  0.375	|   0.634   |   0.800   	|  [config](examples/experiments/selected_trials/yago3-10/complex-yago-graph.yaml)
+ComplEx   	|Combined   |   0.528   |  0.455	|   0.660   |   0.772   	|  [config](examples/experiments/selected_trials/yago3-10/complex-yago-combined.yaml)
+RotatE    	|Epoch    	|   0.432   |  0.337	|   0.619   |   0.768   	|  [config](examples/experiments/selected_trials/yago3-10/rotate-yago-epoch.yaml)
+RotatE    	|Graph    	|   0.432   |  0.337	|   0.619   |   0.768   	|  [config](examples/experiments/selected_trials/yago3-10/rotate-yago-graph.yaml)
+RotatE   	|Combined   |   0.434   |  0.342	|   0.607   |   0.742   	|  [config](examples/experiments/selected_trials/yago3-10/rotate-yago-combined.yaml)
+TransE    	|Epoch    	|   0.499   |  0.406	|   0.661   |   0.794   	|  [config](examples/experiments/selected_trials/yago3-10/transe-yago-epoch.yaml)
+TransE    	|Graph    	|   0.422   |  0.311	|   0.628   |   0.802   	|  [config](examples/experiments/selected_trials/yago3-10/transe-yago-graph.yaml)
+TransE   	|Combined   |   0.499   |  0.406	|   0.661   |   0.794   	|  [config](examples/experiments/selected_trials/yago3-10/transe-yago-combined.yaml)
 
+#### Wikidata5M
 
+Model		|Variant	|   MRR 	|  Hits@1  	|   Hits@10 |   Hits@100    | config
+----    	|----    	|   ----:   |   ----:   |   ----:   |   ----:   	|   ----
+ComplEx    	|Epoch    	|   0.300   |  0.247	|   0.390   |   0.506   	|  [config](examples/experiments/selected_trials/wikidata5m/complex-yago-epoch.yaml)
+ComplEx    	|Graph    	|   0.300   |  0.247	|   0.390   |   0.506   	|  [config](examples/experiments/selected_trials/wikidata5m/complex-yago-graph.yaml)
+ComplEx   	|Combined   |   0.300   |  0.247	|   0.390   |   0.506   	|  [config](examples/experiments/selected_trials/wikidata5m/complex-yago-combined.yaml)
+RotatE    	|Epoch    	|   0.241   |  0.187	|   0.331   |   0.438   	|  [config](examples/experiments/selected_trials/wikidata5m/rotate-yago-epoch.yaml)
+RotatE    	|Graph    	|   0.232   |  0.169	|   0.326   |   0.432   	|  [config](examples/experiments/selected_trials/wikidata5m/rotate-yago-graph.yaml)
+RotatE   	|Combined   |   0.241   |  0.187	|   0.331   |   0.438   	|  [config](examples/experiments/selected_trials/wikidata5m/rotate-yago-combined.yaml)
+TransE    	|Epoch    	|   0.263   |  0.210	|   0.358   |   0.483   	|  [config](examples/experiments/selected_trials/wikidata5m/transe-yago-epoch.yaml)
+TransE    	|Graph    	|   0.263   |  0.210	|   0.358   |   0.483   	|  [config](examples/experiments/selected_trials/wikidata5m/transe-yago-graph.yaml)
+TransE   	|Combined   |   0.268   |  0.213	|   0.363   |   0.480   	|  [config](examples/experiments/selected_trials/wikidata5m/transe-yago-combined.yaml)
 
+#### Freebase
 
+Model		|Variant	|   MRR 	|  Hits@1  	|   Hits@10 |   Hits@100    | config
+----    	|----    	|   ----:   |   ----:   |   ----:   |   ----:   	|   ----
+ComplEx    	|Epoch    	|   0.572   |  0.486	|   0.714   |   0.762   	|  [config](examples/experiments/selected_trials/freebase/complex-yago-epoch.yaml)
+ComplEx    	|Graph    	|   0.594   |  0.511	|   0.726   |   0.767   	|  [config](examples/experiments/selected_trials/freebase/complex-yago-graph.yaml)
+ComplEx   	|Combined   |   0.594   |  0.511	|   0.726   |   0.767   	|  [config](examples/experiments/selected_trials/freebase/complex-yago-combined.yaml)
+RotatE    	|Epoch    	|   0.561   |  0.522	|   0.625   |   0.679   	|  [config](examples/experiments/selected_trials/freebase/rotate-yago-epoch.yaml)
+RotatE    	|Graph    	|   0.613   |  0.578	|   0.669   |   0.719   	|  [config](examples/experiments/selected_trials/freebase/rotate-yago-graph.yaml)
+RotatE   	|Combined   |   0.613   |  0.578	|   0.669   |   0.719   	|  [config](examples/experiments/selected_trials/freebase/rotate-yago-combined.yaml)
+TransE    	|Epoch    	|   0.261   |  0.078	|   0.518   |   0.636   	|  [config](examples/experiments/selected_trials/freebase/transe-yago-epoch.yaml)
+TransE    	|Graph    	|   0.553   |  0.520	|   0.614   |   0.682   	|  [config](examples/experiments/selected_trials/freebase/transe-yago-graph.yaml)
+TransE   	|Combined   |   0.553   |  0.520	|   0.614   |   0.682   	|  [config](examples/experiments/selected_trials/freebase/transe-yago-combined.yaml)
 
 # How to cite
 ```
