@@ -1,0 +1,75 @@
+complex:
+  class_name: ComplEx
+  entity_embedder:
+    dropout: -0.11920741628379194
+    regularize_weight: 2.4427933428465154e-17
+    type: lookup_embedder
+  relation_embedder:
+    dropout: 0.2816594256660814
+    regularize_weight: 9.374824814497078e-12
+    type: lookup_embedder
+dataset:
+  name: yago3-10
+entity_ranking:
+  chunk_size: 50000
+eval:
+  batch_size: 128
+import:
+- complex
+job:
+  type: train
+lookup_embedder:
+  class_name: LookupEmbedder
+  dim: 128
+  dropout: 0.0
+  initialize: xavier_uniform_
+  initialize_args:
+    normal_:
+      mean: 0.0
+      std: 0.0004992480318662177
+    uniform_:
+      a: -0.34891431704658815
+    xavier_normal_:
+      gain: 1.0
+    xavier_uniform_:
+      gain: 1.0
+  normalize:
+    p: -1.0
+  regularize: lp
+  regularize_args:
+    p: 2
+    weighted: true
+  regularize_weight: 0.0
+  sparse: true
+model: complex
+negative_sampling:
+  class_name: TrainingJobNegativeSampling
+  implementation: batch
+  num_samples:
+    o: 2463
+    p: 0
+    s: 7903
+  sampling_type: uniform
+  shared: true
+  shared_type: default
+  with_replacement: false
+train:
+  auto_correct: true
+  batch_size: 1024
+  loss: kl
+  loss_arg: 1.0
+  max_epochs: 400
+  num_workers: 0
+  optimizer:
+    default:
+      args:
+        lr: 0.14545742107749823
+      type: Adagrad
+  type: negative_sampling
+valid:
+  early_stopping:
+    patience: 50
+    threshold:
+      epochs: 10
+      metric_value: 0.05
+  every: 5

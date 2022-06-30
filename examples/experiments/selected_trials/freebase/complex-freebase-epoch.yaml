@@ -1,0 +1,132 @@
+complex:
+  class_name: ComplEx
+  entity_embedder:
+    dropout: -0.00833610276340957
+    regularize_weight: 0.00010590588532699558
+    type: lookup_embedder
+  relation_embedder:
+    dropout: -0.027712876723172908
+    regularize_weight: 4.131745448216439e-15
+    type: lookup_embedder
+dataset:
+  files:
+    test:
+      filename: test.del
+      type: triples
+    test_small:
+      filename: test_small.del
+      type: triples
+    test_tiny:
+      filename: test_tiny.del
+      type: triples
+    train:
+      filename: train.del
+      type: triples
+    valid:
+      filename: valid.del
+      type: triples
+    valid_small:
+      filename: valid_small.del
+      type: triples
+    valid_tiny:
+      filename: valid_tiny.del
+      type: triples
+  name: freebase
+distributed_model:
+  base_model:
+    type: complex
+entity_ranking:
+  chunk_size: 15000
+  class_name: EntityRankingJob
+  filter_splits:
+  - train
+  - valid
+  filter_with_test: true
+eval:
+  batch_size: 50
+  num_workers: 0
+  split: valid_tiny
+  trace_level: epoch
+  type: entity_ranking
+import:
+- distributed_model
+- complex
+job:
+  device: cuda
+  device_pool:
+  - cuda:0
+  - cuda:1
+  - cuda:2
+  - cuda:3
+  distributed:
+    num_eval_workers: 4
+    num_partitions: 8
+    num_workers: 8
+    parameter_server: shared
+    partition_type: random
+    repartition_epoch: true
+  type: train
+lookup_embedder:
+  class_name: LookupEmbedder
+  dim: 128
+  dropout: 0.0
+  initialize: xavier_uniform_
+  initialize_args:
+    normal_:
+      mean: 0.0
+      std: 0.00015945859169740878
+    uniform_:
+      a: -0.395088151046903
+    xavier_normal_:
+      gain: 1.0
+    xavier_uniform_:
+      gain: 1.0
+  normalize:
+    p: -1.0
+  pretrain:
+    ensure_all: false
+    model_filename: ''
+  regularize: lp
+  regularize_args:
+    p: 2
+    weighted: true
+  regularize_weight: 0.0
+  sparse: true
+model: distributed_model
+negative_sampling:
+  class_name: TrainingJobNegativeSampling
+  implementation: batch
+  num_samples:
+    o: 9743
+    p: 0
+    s: 7484
+  sampling_type: uniform
+  shared: true
+  shared_type: default
+  with_replacement: false
+train:
+  abort_on_nan: true
+  auto_correct: true
+  batch_size: 1024
+  loss: kl
+  loss_arg: 1.0
+  max_epochs: 10
+  num_workers: 0
+  optimizer:
+    default:
+      args:
+        lr: 0.9036484384966996
+      type: dist_rowadagrad
+  split: train
+  trace_level: epoch
+  type: distributed_negative_sampling
+valid:
+  early_stopping:
+    patience: 0
+    threshold:
+      epochs: 0
+      metric_value: 0.0
+  every: 1
+  metric: mean_reciprocal_rank_filtered
+  split: valid_tiny
+  trace_level: epoch
