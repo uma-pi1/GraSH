@@ -541,6 +541,8 @@ class DefaultSharedNegativeSample(BatchNegativeSample):
             else self.positive_triples[indexes, :]
         )
         drop_index = self._drop_index if indexes is None else self._drop_index[indexes]
+        # fniesel: needed to change dtype from int32 to int64
+        drop_index = drop_index.type(torch.int64)
         chunk_size = len(triples)
 
         # create output tensor
@@ -582,6 +584,8 @@ class DefaultSharedNegativeSample(BatchNegativeSample):
             self.positive_triples[indexes, :] if indexes else self.positive_triples
         )
         drop_index = self._drop_index[indexes] if indexes else self._drop_index
+        # fniesel: needed to change dtype from int32 to int64
+        drop_index = drop_index.type(torch.int64)
         drop_rows = torch.nonzero(drop_index != num_unique, as_tuple=False).squeeze()
         chunk_size = len(triples)
 
