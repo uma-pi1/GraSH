@@ -126,7 +126,7 @@ TransE   	|Combined   |   0.553   |  0.520	|   0.614   |   0.682   	|  [config](
 @article{kochsiek2022start,
   title={Start Small, Think Big: On Hyperparameter Optimization for Large-Scale Knowledge Graph Embeddings},
   author={Kochsiek, Adrian and Niesel, Fritz and Gemulla, Rainer},
-  journal={arXiv preprint arXiv:2206.00470},
+  journal={arXiv preprint},
   year={2022}
 }
 ```
