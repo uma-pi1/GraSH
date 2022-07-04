@@ -1,4 +1,4 @@
-# GraSH: Knowledge Graph Successive Halving
+# GraSH: Successive Halving for Knowledge Graphs
 
 
 This is the code and configuration accompanying the paper ["Start Small, Think Big: On Hyperparameter Optimization for Large-Scale Knowledge Graph Embeddings"](tbd.).
