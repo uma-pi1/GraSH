@@ -48,7 +48,7 @@ class WorkPackage:
     wait = False
 
 
-class WorkScheduler(mp.get_context("spawn").Process):
+class WorkScheduler(mp.get_context("fork").Process):
     def __init__(
         self,
         config,

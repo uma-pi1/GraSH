@@ -130,12 +130,8 @@ class GraSHSearchJob(AutoSearchJob):
 
             # compute relative sizes and costs for the available subsets
             cost_metric = self.config.get("grash_search.cost_metric")
-            # self
-            #
-            # .subset_stats = self.config.get("grash_search.subsets")
             for i in range(len(self.subset_stats)):
-                # todo: auto weg
-                if cost_metric in ["auto", "triples_and_entities"]:
+                if cost_metric in ["triples_and_entities"]:
                     self.subset_stats[i]["rel_costs"] = (
                         self.subset_stats[i]["rel_entities"]
                         * self.subset_stats[i]["rel_triples"]
@@ -149,7 +145,6 @@ class GraSHSearchJob(AutoSearchJob):
                         f"GraSH cost metric {cost_metric} is not supported."
                     )
 
-        # worker_futures = []
         # Create workers (dummy logger to avoid output overhead from HPBandSter)
         worker_logger = logging.getLogger("dummy")
         worker_logger.setLevel(logging.DEBUG)

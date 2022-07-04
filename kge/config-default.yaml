@@ -729,23 +729,15 @@ grash_search:
   # Maximal budget in terms of full train runs given for the complete search
   search_budget: 4
 
-  # Epoch bdget tolerance is added to the respective round's epoch budget. Index 0 refers
-  # to the first and last index to the last SH round.
-  # epoch_budget_tolerance: [0,0,0,0,0]
-
-  # Maximum epochs for training. Will be scaled down based on the SH budget in each round.
-  # max_epoch_budget: 400
 
   # Eta for size and epoch budget. Budget will be shared equally between size and epochs.
   eta: 4
 
   # Only relevant for the dataset variant
   # Metric to select subgraph
-  # - power_usage: estimated power usage of subgraph (needs to be provided manually)
   # - triples: amount of training triples in the subgraphs
   # - triples_and_entities: relative amount of training triples * relative amount of entities
-  # - auto: use estimated power usage if provided, otherwise triples_and_entities
-  cost_metric: "auto"
+  cost_metric: "triples"
 
   # Initialize the models with the same values in each round
   keep_initialization: true
@@ -755,8 +747,8 @@ grash_search:
   keep_pretrained: false
 
   # Only relevant for the dataset variant
-  # amount of negatves are scaled down
-  # to avoid to few negatives set a minimum percantage of negatives to use
+  # number of negatives are scaled down
+  # to avoid too few negatives set a minimum percentage of negatives to use
   # to turn off scaling set min_negatives_percentage to 1.0
   min_negatives_percentage: 0.01
 
