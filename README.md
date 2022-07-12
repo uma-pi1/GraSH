@@ -35,7 +35,6 @@ cd ..
 
 # train an example model on toy dataset (you can omit '--job.device cpu' when you have a gpu)
 python -m kge start examples/toy-complex-train.yaml --job.device cpu
-todo: provide toy example for GraSH
 ```
 This example will train on a toy dataset in a sequential setup on CPU
 
@@ -68,6 +67,10 @@ train:
   max_epochs: 400
 ````
 
+- `eta` defines the reduction factor during the search. Per round the number of remaining trials is reduced to `1/eta`
+- `search_budget` is defined in "number of full training runs". The default choice `search_budget=3`, for example, corresponds to an overall search cost of three full training runs. 
+- `variant` controls which reduction technique to use (only epoch, only graph, or combined)
+
 ## Run a GraSH hyperparameter search
 Run the default search on yago3-10 with the following command:
 ```sh
@@ -78,6 +81,7 @@ By default, each experiment will create a new folder in `local/experiments/<time
 
 
 ## Results and Configurations
+All results were obtained with the GraSH default settings (`num_trials=64, eta=4, search_budget=3, variant=combined`)
 
 #### Yago3-10
 
