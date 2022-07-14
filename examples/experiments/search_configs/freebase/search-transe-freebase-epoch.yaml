@@ -1,3 +1,5 @@
+import:
+- distributed_model
 dataset:
   name: freebase
   pickle: false

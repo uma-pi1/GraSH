@@ -1,4 +1,6 @@
-dataset:
+import:
+- distributed_model
+ dataset:
   name: freebase
   pickle: false
 entity_ranking:
