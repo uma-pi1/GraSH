@@ -26,7 +26,6 @@ grash_search:
   keep_initialization: true
   keep_pretrained: false
   min_negatives_percentage: 0.01
-  num_hpb_iter: 1
   num_trials: 64
   parameters:
   - bounds:

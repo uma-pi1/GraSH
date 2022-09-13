@@ -1,5 +1,5 @@
 dataset:
-  name: yago3-10
+  name: wikidata5m
   pickle: false
 entity_ranking:
   chunk_size: 50000
@@ -26,7 +26,6 @@ grash_search:
   keep_initialization: true
   keep_pretrained: false
   min_negatives_percentage: 0.01
-  num_hpb_iter: 1
   num_trials: 64
   parameters:
   - bounds:
@@ -96,7 +95,7 @@ grash_search:
     name: negative_sampling.num_samples.o
     type: range
   port: None
-  run_id: grash-yago
+  run_id: grash-wikidata
   search_budget: 3
   seed: 2
   variant: combined
@@ -159,7 +158,7 @@ train:
   loss: kl
   loss_arg: 1.0
   lr_scheduler: ''
-  max_epochs: 400
+  max_epochs: 64
   num_workers: 0
   optimizer: Adagrad
   pin_memory: false
@@ -173,7 +172,7 @@ valid:
     threshold:
       epochs: 10
       metric_value: 0.05
-  every: 5
+  every: 4
   metric: mean_reciprocal_rank_filtered
   metric_expr: float("nan")
   split: valid
