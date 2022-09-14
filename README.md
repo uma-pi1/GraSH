@@ -21,7 +21,7 @@ We provide the hyperparameter settings for the searches and finally selected tri
 ```sh
 # retrieve and install project in development mode
 git clone https://github.com/uma-pi1/grash.git
-cd GraSH
+cd grash
 pip install -e .
 
 # download and preprocess datasets
@@ -33,7 +33,7 @@ cd ..
 #### Training
 ```sh
 
-# train an example model on toy dataset (you can omit '--job.device cpu' when you have a gpu)
+# train an example model on a toy dataset (you can omit '--job.device cpu' when you have a gpu)
 python -m kge start examples/toy-complex-train.yaml --job.device cpu
 ```
 This example will train on a toy dataset in a sequential setup on CPU
@@ -41,11 +41,11 @@ This example will train on a toy dataset in a sequential setup on CPU
 
 #### GraSH Hyperparameter Search
 ```sh
-# perform a search with GraSH on the dataset yago3-10 with the model ComplEx
-python -m kge start examples/experiments/search_configs/yago3-10/search-complex-yago-combined.yaml
+# perform a search with GraSH on a toy dataset with the model ComplEx
+python -m kge start examples/toy-complex-search-grash.yaml
 ```
 
-
+This example will perform a small GraSH search with 16 trials on a toy dataset in a sequential setup on GPU
 
 
 ## Configuration of GraSH Search
