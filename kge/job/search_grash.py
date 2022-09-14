@@ -95,6 +95,8 @@ class GraSHSearchJob(AutoSearchJob):
         self.result_dict = manager.dict()
         self.processes = []
         self.sh_rounds = 0
+        self.eta = 0
+        self.num_trials = 0
         self.subset_stats = dict()
         self.subsets = dict()
 
@@ -120,9 +122,28 @@ class GraSHSearchJob(AutoSearchJob):
             for k, v in self.results[0].items():
                 self.trial_dict[k] = v
 
-        if self.config.get("grash_search.variant") != "epoch":
-            # todo: replace by information from yaml-file in future and only load relevant subsets
+        # Determine corresponding Hyperband configuration for GraSH configuration
+        self.num_trials = self.config.get("grash_search.num_trials")
+        self.eta = self.config.get("grash_search.eta")
+        sh_rounds = math.log(self.num_trials, self.eta)
+        if not sh_rounds.is_integer():
+            if self.config.get("job.auto_correct"):
+                sh_rounds = math.floor(sh_rounds)
+                self.num_trials = self.eta ** sh_rounds
+                self.config.log(
+                    "Setting grash_search.num_trials to {}, was set to {} and needs to "
+                    "equal a positive integer power of eta.".format(self.num_trials,
+                                                                    self.config.get("grash_search.num_trials"))
+                )
+            else:
+                raise Exception(
+                    "grash_search.num_trials was set to {}, "
+                    "needs to equal a positive integer power of eta.".format(self.num_trials)
+                )
+        self.sh_rounds = int(sh_rounds)
 
+        # Perform k-core decomposition if not done yet
+        if self.config.get("grash_search.variant") != "epoch":
             # add full dataset to subset dict and get k_core_stats
             self.subsets[0] = self.dataset
             subgraph = Subgraph(self.dataset)
@@ -251,27 +272,6 @@ class GraSHSearchJob(AutoSearchJob):
             self.config.get("grash_search.num_search_worker_per_round")
         )
 
-        # Determine corresponding Hyperband configuration for GraSH configuration
-        num_trials = self.config.get("grash_search.num_trials")
-        eta = self.config.get("grash_search.eta")
-        sh_rounds = math.log(num_trials, eta)
-        if not sh_rounds.is_integer():
-            if self.config.get("job.auto_correct"):
-                sh_rounds = math.floor(sh_rounds)
-                num_trials = eta ** sh_rounds
-                self.config.log(
-                    "Setting grash_search.num_trials to {}, was set to {} and needs to "
-                    "equal a positive integer power of eta.".format(num_trials,
-                                                                    self.config.get("grash_search.num_trials"))
-                )
-                # todo: update config file?
-            else:
-                raise Exception(
-                    "grash_search.num_trials was set to {}, "
-                    "needs to equal a positive integer power of eta.".format(num_trials)
-                )
-        self.sh_rounds = int(sh_rounds)
-
         # Configure the job
         hpb = HyperBandPatch(
             free_devices=self.free_devices,
@@ -281,9 +281,8 @@ class GraSHSearchJob(AutoSearchJob):
             run_id=self.config.get("grash_search.run_id"),
             nameserver=self.config.get("grash_search.host"),
             result_logger=result_logger,
-            # previous_result=previous_run,
-            eta=eta,
-            min_budget=1/num_trials,
+            eta=self.eta,
+            min_budget=1 / self.num_trials,
             max_budget=1,
             trial_dict=self.trial_dict,
             id_dict=self.id_dict,
