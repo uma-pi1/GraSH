@@ -26,12 +26,9 @@ setup(
         "py3nvml",
         "tqdm",
         "mock",
-        "dgl==0.4.3post2",  # only used for graph-cut partitioning
         "hpbandster",
         "ConfigSpace",
-        "shutil",
         "igraph",
-        "yaml",
     ],
     # Ax 0.1.10 requires python 3.7. Numba does not yet support for Python 3.9:
     # https://github.com/numba/numba/issues/6345
