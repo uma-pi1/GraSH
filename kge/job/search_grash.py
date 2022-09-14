@@ -587,8 +587,9 @@ class GraSHWorker(Worker):
                     pass
         gc.collect()
         _kill_active_cuda_tensors()
-        with torch.cuda.device(conf.get("job.device")):
-            torch.cuda.empty_cache()
+        if not conf.get("job.device") == "cpu":
+            with torch.cuda.device(conf.get("job.device")):
+                torch.cuda.empty_cache()
         gc.collect()
 
         # remove parameters that can be ignored when resuming

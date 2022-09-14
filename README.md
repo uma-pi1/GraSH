@@ -41,11 +41,11 @@ This example will train on a toy dataset in a sequential setup on CPU
 
 #### GraSH Hyperparameter Search
 ```sh
-# perform a search with GraSH on a toy dataset with the model ComplEx
-python -m kge start examples/toy-complex-search-grash.yaml
+# perform a search with GraSH on a toy dataset (you can omit '--job.device cpu' when you have a gpu)
+python -m kge start examples/toy-complex-search-grash.yaml --job.device cpu
 ```
 
-This example will perform a small GraSH search with 16 trials on a toy dataset in a sequential setup on GPU
+This example will perform a small GraSH search with 16 trials on a toy dataset in a sequential setup on CPU
 
 
 ## Configuration of GraSH Search
