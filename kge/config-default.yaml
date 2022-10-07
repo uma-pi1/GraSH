@@ -716,9 +716,9 @@ grash_search:
   class_name: GraSHSearchJob
 
   # Nameserver configuration required by HPBandSter
-  run_id: ''
-  host: ''
-  port: ''
+  run_id: 'grash-search'
+  host: '127.0.0.2'
+  port: None
 
   # Random seed for generating the trial configs
   seed: 0

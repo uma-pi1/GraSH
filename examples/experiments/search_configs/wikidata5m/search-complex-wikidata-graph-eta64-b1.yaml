@@ -22,7 +22,6 @@ grash_search:
   class_name: GraSHSearchJob
   cost_metric: triples
   eta: 64
-  host: 127.0.0.2
   keep_initialization: true
   keep_pretrained: false
   min_negatives_percentage: 0.01
@@ -94,8 +93,6 @@ grash_search:
     log_scale: false
     name: negative_sampling.num_samples.o
     type: range
-  port: None
-  run_id: grash-wikidata
   search_budget: 1
   seed: 2
   variant: graph
