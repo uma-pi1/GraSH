@@ -11,9 +11,6 @@ grash_search:
   num_trials: 16
   search_budget: 12
   variant: combined
-  host: 127.0.0.2
-  port: None
-  run_id: grash-toy
   parameters:
     - name: train.optimizer.default.args.lr
       type: range
