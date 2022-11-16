@@ -130,10 +130,10 @@ TransE   	|Combined   |   0.553   |  0.520	|   0.614   |   0.682   	|  [config](
 
 # How to cite
 ```
-@article{kochsiek2022start,
+@inproceedings{kochsiek2022start,
   title={Start Small, Think Big: On Hyperparameter Optimization for Large-Scale Knowledge Graph Embeddings},
   author={Kochsiek, Adrian and Niesel, Fritz and Gemulla, Rainer},
-  journal={arXiv preprint arXiv:2207.04979},
+  booktitle={Joint European Conference on Machine Learning and Knowledge Discovery in Databases},
   year={2022}
 }
 ```
