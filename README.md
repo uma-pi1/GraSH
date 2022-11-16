@@ -6,6 +6,9 @@ The code extends the knowledge graph embedding library for distributed training 
 For documentation on Dist-KGE refer to the Dist-KGE repository.
 We provide the hyperparameter settings for the searches and finally selected trials in /examples/experiments/.
 
+**UPDATE:**
+GraSH was recently merged into our main library [LibKGE](https://github.com/uma-pi1/kge). All configs from this repository, except the ones for Freebase that require distributed training, can be executed in LibKGE. Please use LibKGE for your own experiments with GraSH.
+
 
 ## Table of contents
 
