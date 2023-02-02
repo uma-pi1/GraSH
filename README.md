@@ -1,7 +1,7 @@
 # GraSH: Successive Halving for Knowledge Graphs
 
 
-This is the code and configuration accompanying the paper ["Start Small, Think Big: On Hyperparameter Optimization for Large-Scale Knowledge Graph Embeddings"](https://arxiv.org/abs/2207.04979).
+This is the code and configuration accompanying the paper ["Start Small, Think Big: On Hyperparameter Optimization for Large-Scale Knowledge Graph Embeddings"](https://arxiv.org/abs/2207.04979) presented at ECML-PKDD 2022.
 The code extends the knowledge graph embedding library for distributed training [Dist-KGE](https://github.com/uma-pi1/dist-kge).
 For documentation on Dist-KGE refer to the Dist-KGE repository.
 We provide the hyperparameter settings for the searches and finally selected trials in /examples/experiments/.
